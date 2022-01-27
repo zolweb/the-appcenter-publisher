@@ -5,23 +5,26 @@
 const { prompt } = require('enquirer');
 const { execSync } = require('child_process');
 const fs = require('fs');
-const projectConfigFile = require('../../.publishrc');
+const appRootPath = require('app-root-path');
+
+// eslint-disable-next-line import/no-dynamic-require
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
 
 // #################
 // Constants
 // #################
 
-const STARTING_VERSION_NUMBER = projectConfigFile?.startingVersionNumber || '1.0.0';
+const STARTING_VERSION_NUMBER = CONFIG_FILE?.startingVersionNumber || '1.0.0';
 
-const APP_CENTER_USERNAME = projectConfigFile?.appCenter?.userName;
-const APP_CENTER_APP_NAMES = projectConfigFile?.appCenter?.appName; // {ios:string, android:string}
-const APP_CENTER_API_TOKEN = projectConfigFile?.appCenter?.token;
+const APP_CENTER_USERNAME = CONFIG_FILE?.appCenter?.userName;
+const APP_CENTER_APP_NAMES = CONFIG_FILE?.appCenter?.appName; // {ios:string, android:string}
+const APP_CENTER_API_TOKEN = CONFIG_FILE?.appCenter?.token;
 const APP_CENTER_MAX_RELEASE_MESSAGE_LENGH = 4500;
 
-const GIT_BRANCHES = projectConfigFile?.git?.branches || { staging: 'develop', 'pre-prod': 'pre-prod', prod: 'main' };
-const COMMIT_FEATURE_PREFIX = projectConfigFile?.git?.commitPrefixes?.feature || '[+]';
-const COMMIT_FIX_PREFIX = projectConfigFile?.git?.commitPrefixes?.bugFix || '[#]';
-const GITLAB_REPO_URL = `${projectConfigFile?.git?.repoURL}commit/`;
+const GIT_BRANCHES = CONFIG_FILE?.git?.branches || { staging: 'develop', 'pre-prod': 'pre-prod', prod: 'main' };
+const COMMIT_FEATURE_PREFIX = CONFIG_FILE?.git?.commitPrefixes?.feature || '[+]';
+const COMMIT_FIX_PREFIX = CONFIG_FILE?.git?.commitPrefixes?.bugFix || '[#]';
+const GITLAB_REPO_URL = `${CONFIG_FILE?.git?.repoURL}commit/`;
 
 const IS_LINUX = process.platform === 'linux';
 

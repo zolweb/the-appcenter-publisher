@@ -25,6 +25,7 @@
     "eslint-plugin-import": "^2.25.4"
   },
   "dependencies": {
+    "app-root-path": "^3.0.0",
     "enquirer": "^2.3.6"
   }
 }
