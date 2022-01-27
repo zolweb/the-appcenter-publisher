@@ -1,0 +1,28 @@
+{
+  "name": "zol-appcenter-publish",
+  "version": "1.0.0",
+  "description": "Easy deploy React Native projects on AppCenter",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@gitlab.com/zolteam/zol-appcenter-publish.git"
+  },
+  "author": "ZOL Front Team",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/zolteam/zol-appcenter-publish/issues"
+  },
+  "homepage": "https://gitlab.com/zolteam/zol-appcenter-publish#readme",
+  "devDependencies": {
+    "eslint": "^8.7.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.25.4"
+  },
+  "dependencies": {
+    "enquirer": "^2.3.6"
+  }
+}
