@@ -17,7 +17,7 @@ Then in your `package.json` add
 },
 ```
 
-Finally in the root directory of your project create a `.publishrc.js`
+Finally in the root directory of your project create a `.publishrc.js`, this will be your script config file.
 
 ## Config file
 
