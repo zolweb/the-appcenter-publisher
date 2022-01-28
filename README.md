@@ -53,12 +53,12 @@ module.exports = {
     },
   },
   git: {
-    repoURL: 'https://gitlab.com/[my_team]/[my_project]/'
+    repoURL: 'https://gitlab.com/[my_team]/[my_project]/',
     branches: {
-      staging: 'git_branch_name', // Your git branch name pointing to your staging env
-      'pre-prod': 'git_branch_name', // Your git branch name pointing to your pre-production env
-      prod: 'git_branch_name', // Your git branch name pointing to your production env
-    }
+      staging: 'develop', // Your git branch name pointing to your staging env
+      'pre-prod': 'pre-prod', // Your git branch name pointing to your pre-production env
+      prod: 'main', // Your git branch name pointing to your production env
+    },
     commitPrefixes: {
       feature: '[+]', // custom your commit prefix to identify new feature in changelog
       bugFix: '[#]', // custom your commit prefix to identify bug fixes in changelog
