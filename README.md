@@ -5,7 +5,7 @@ This script ease the process of publishing React Native builds with AppCenter an
 ## How to install
 
 ```
-yarn add zol-appcenter-publish
+yarn add -D zol-appcenter-publish
 ```
 
 Then in your `package.json` add 
