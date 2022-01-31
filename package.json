@@ -1,5 +1,5 @@
 {
-  "name": "zol-appcenter-publish",
+  "name": "zol-msappcenter-publish",
   "version": "0.1.2",
   "description": "Easy deploy React Native projects on AppCenter",
   "main": "index.js",

@@ -1,6 +1,6 @@
 # zol-appcenter-publish
 
-This script ease the process of publishing React Native builds with AppCenter and managing the versionning of your App. Each build to production env will also create a Git Tag and populate a CHANGELOG.md file at the root of your project based on your commits messages.
+This script ease the process of publishing React Native builds with Microsoft AppCenter and managing the versionning of your App. Each build to production env will also create a Git Tag and populate a CHANGELOG.md file at the root of your project based on your commits messages.
 
 ## How to install
 
