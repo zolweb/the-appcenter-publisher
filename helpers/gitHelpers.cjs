@@ -45,11 +45,17 @@ const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFI
 };
 
 const gitTagBranch = async (versionNumberToTag) => {
-  printConsoleMessage(`Tag new version ${versionNumberToTag}`);
-  execSync(
-    `git tag -a ${versionNumberToTag} -m 'version ${versionNumberToTag}'`,
-  );
-  execSync(`git push origin ${versionNumberToTag}'`);
+  const isVersionAlreadyTagged = execSync(`git tag -l ${versionNumberToTag}'`).toString('utf-8').length > 0;
+
+  if (!isVersionAlreadyTagged) {
+    printConsoleMessage(`Tag new version ${versionNumberToTag}`);
+    execSync(
+      `git tag -a ${versionNumberToTag} -m 'version ${versionNumberToTag}'`,
+    );
+    execSync(`git push origin ${versionNumberToTag}'`);
+  } else {
+    printConsoleMessage(`Tag ${versionNumberToTag} already exists, skipping step`);
+  }
 };
 
 const gitCommitsHistory = (latestTag, commitSplitMarker) => {
@@ -64,6 +70,32 @@ const gitCommitsHistory = (latestTag, commitSplitMarker) => {
     const lastPublishCommitHash = execSync("git log --grep=\"Publish\" --format='%H,'").toString('utf-8').split(',')[0];
     return execSync(`git log ${lastPublishCommitHash}..HEAD --format=%B%H${commitSplitMarker}`).toString(
       'utf-8',
+    );
+  }
+};
+
+const gitCreateCommitMessage = (
+  newChangelog,
+  commitSplitMarker,
+  newVersionNumber,
+  targetedEnv,
+  CONFIG,
+) => {
+  const commitMessageBase = `Publish new ${targetedEnv} version`;
+  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(commitMessageBase);
+
+  if (!isLastCommitAlreadyAPublish) {
+    printConsoleMessage(
+      `Create publishing commit for version ${newVersionNumber}`,
+    );
+    execSync('git add .');
+    execSync(
+      `git commit --allow-empty -m "${commitMessageBase} ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
+    );
+    execSync('git push');
+  } else {
+    printConsoleMessage(
+      'Publish commit already exists, skipping step',
     );
   }
 };
@@ -99,21 +131,13 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     fs.writeFileSync('./CHANGELOG.md', `${newChangelog}${currentChangelog}`);
   }
 
-  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(`Publish new ${CONFIG.git.branches[targetedEnv]}`);
-  if (!isLastCommitAlreadyAPublish) {
-    printConsoleMessage(
-      `Create publishing commit for version ${newVersionNumber}`,
-    );
-    execSync('git add .');
-    execSync(
-      `git commit --allow-empty -m "Publish new ${targetedEnv} version ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
-    );
-    execSync('git push');
-  } else {
-    printConsoleMessage(
-      'Skipping publish commit, it already exists',
-    );
-  }
+  gitCreateCommitMessage(
+    newChangelog,
+    commitSplitMarker,
+    newVersionNumber,
+    targetedEnv,
+    CONFIG,
+  );
 
   return newVersionNumber;
 };
