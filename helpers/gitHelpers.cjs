@@ -99,7 +99,7 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     fs.writeFileSync('./CHANGELOG.md', `${newChangelog}${currentChangelog}`);
   }
 
-  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes('Publish');
+  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(`Publish new ${CONFIG.git.branches[targetedEnv]}`);
   if (!isLastCommitAlreadyAPublish) {
     printConsoleMessage(
       `Create publishing commit for version ${newVersionNumber}`,
