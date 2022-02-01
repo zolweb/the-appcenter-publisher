@@ -5,7 +5,7 @@ This script ease the process of publishing React Native builds with Microsoft Ap
 ## How to install
 
 ```
-yarn add -D zol-appcenter-publish
+yarn add -D zol-msappcenter-publish
 ```
 
 Then in your `package.json` add 
@@ -13,7 +13,7 @@ Then in your `package.json` add
 ```
 "scripts": {
   ...
-  "appcenter:publish": "./node_modules/zol-appcenter-publish/index.cjs"
+  "appcenter:publish": "./node_modules/zol-msappcenter-publish/index.cjs"
 },
 ```
 
