@@ -45,7 +45,7 @@ const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFI
 };
 
 const gitTagBranch = async (versionNumberToTag) => {
-  const isVersionAlreadyTagged = execSync(`git tag -l ${versionNumberToTag}'`).toString('utf-8').length > 0;
+  const isVersionAlreadyTagged = execSync(`git tag -l '${versionNumberToTag}'`).toString('utf-8').length > 0;
 
   if (!isVersionAlreadyTagged) {
     printConsoleMessage(`Tag new version ${versionNumberToTag}`);
