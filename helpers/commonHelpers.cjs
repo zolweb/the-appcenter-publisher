@@ -23,7 +23,7 @@ const printConsoleMessage = (message) => console.log(`\x1b[1m▸ ${message}\x1b[
 /**
  * @param  {string} message - Message you want to print in console output
  */
-const printErrorConsoleMessage = (message) => console.log(`\x1b[1;31mX ERROR - ${message}\x1b[0m`);
+const printErrorConsoleMessage = (message) => console.error(`\x1b[1;31mX ERROR - ${message}\x1b[0m`);
 /**
  * Method to verify the integrity of the .publishrc.js Config file. Will output an error message
  * if some attributes are missing, otherwise will return the full config object

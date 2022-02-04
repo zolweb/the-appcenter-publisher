@@ -33,7 +33,7 @@ const deployCLI = async () => {
     // Get config file from App root directory
     const CONFIG = projectConfig(CONFIG_FILE);
     // Run all the git commands to manage the versionning
-    manageGitFlow(branch, CONFIG);
+    // manageGitFlow(branch, CONFIG);
     // Trigger AppCenter build via API call
     triggerAppCenterBuild(platform, branch, CONFIG);
   } catch {
