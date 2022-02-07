@@ -52,7 +52,7 @@ const gitTagBranch = async (versionNumberToTag) => {
     execSync(
       `git tag -a ${versionNumberToTag} -m 'version ${versionNumberToTag}'`,
     );
-    execSync(`git push origin ${versionNumberToTag}'`);
+    execSync(`git push origin ${versionNumberToTag}`);
   } else {
     printConsoleMessage(`Tag ${versionNumberToTag} already exists, skipping step`);
   }
