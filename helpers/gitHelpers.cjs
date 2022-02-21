@@ -29,6 +29,9 @@ const getLatestTagVersionNumber = (startingVersionNumber) => {
  */
 const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFIG) => {
   if (gitMessage > MAX_CHANGELOG_LENGTH) {
+    printConsoleMessage(
+      'Git message too long, getting changes since last publish.',
+    );
     const lastPublishCommitHash = execSync("git log --grep=\"Publish\" --format='%H,'").toString('utf-8').split(',')[0];
     const gitLogOutput = execSync(`git log ${lastPublishCommitHash}..HEAD --format=%B%H${commitSplitMarker}`).toString(
       'utf-8',
@@ -65,10 +68,9 @@ const gitCommitsHistory = (latestTag, commitSplitMarker) => {
     ).toString('utf-8');
   } catch {
     printConsoleMessage(
-      'No Tag found, getting commits since last publish',
+      'No Tag found, getting commits since project began.',
     );
-    const lastPublishCommitHash = execSync("git log --grep=\"Publish\" --format='%H,'").toString('utf-8').split(',')[0];
-    return execSync(`git log ${lastPublishCommitHash}..HEAD --format=%B%H${commitSplitMarker}`).toString(
+    return execSync(`git log --format=%B%H${commitSplitMarker}`).toString(
       'utf-8',
     );
   }
