@@ -28,7 +28,7 @@ const getLatestTagVersionNumber = (startingVersionNumber) => {
  * @return {String}
  */
 const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFIG) => {
-  if (gitMessage > MAX_CHANGELOG_LENGTH) {
+  if (gitMessage.length > MAX_CHANGELOG_LENGTH) {
     printConsoleMessage(
       'Git message too long, getting changes since last publish.',
     );
