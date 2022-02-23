@@ -5,6 +5,7 @@ const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers.cjs');
 const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers.cjs');
 
 const MAX_CHANGELOG_LENGTH = 3000;
+const CHANGELOG_FILE_PATH = './CHANGELOG.md';
 
 /**
  * Fetch the last git tag and return it, if no tag return the starting version number from CONFIG
@@ -124,13 +125,18 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     features.length,
   );
 
-  const currentChangelog = fs.readFileSync('./CHANGELOG.md', 'utf-8');
-
   const newChangelog = formatTheChangeLog(features, fixes, newVersionNumber);
+  const changelogFileExists = fs.existsSync(CHANGELOG_FILE_PATH);
+
+  if (!changelogFileExists && shouldGenerateChangeLog) {
+    printConsoleMessage('No CHANGELOG.md file found, creating one');
+    fs.writeFileSync(CHANGELOG_FILE_PATH, '');
+  }
 
   if (shouldGenerateChangeLog) {
+    const currentChangelog = fs.readFileSync(CHANGELOG_FILE_PATH, 'utf-8');
     printConsoleMessage(`Generate Change Log for version ${newVersionNumber}`);
-    fs.writeFileSync('./CHANGELOG.md', `${newChangelog}${currentChangelog}`);
+    fs.writeFileSync(CHANGELOG_FILE_PATH, `${newChangelog}${currentChangelog}`);
   }
 
   gitCreateCommitMessage(
