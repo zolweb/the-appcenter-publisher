@@ -15,13 +15,14 @@ const promptQuestions = [
   {
     type: 'multiselect',
     name: 'platform',
-    message: 'Pour quel(s) OS générer un build ?',
+    message: 'Select the platform(s) for your build',
     choices: ['ios', 'android'],
+    validate: (choices) => (choices.length === 0 ? 'You need to choose at lease one platform to start building' : true),
   },
   {
     type: 'select',
     name: 'branch',
-    message: 'Pour quel environnement ?',
+    message: 'Select the environment you want your app built for',
     choices: ['staging', 'pre-prod', 'prod'],
   },
 ];

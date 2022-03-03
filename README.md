@@ -8,7 +8,7 @@ This script ease the process of publishing React Native builds with Microsoft Ap
 yarn add -D zol-msappcenter-publish
 ```
 
-Then in your `package.json` add 
+Then in your `package.json` add
 
 ```
 "scripts": {
@@ -21,7 +21,7 @@ Finally in the root directory of your project create a `.publishrc.js`, this wil
 
 ## Config file
 
-In order for the script to run you will need the basic configuration : 
+In order for the script to run you will need the basic configuration :
 
 ```
 module.exports = {
@@ -66,3 +66,7 @@ module.exports = {
   }
 }
 ```
+
+## Build flow
+
+We thought a strict but usefull flow to publish our release that will impact how you will be using this publishing script. Your `staging` branch should always be your stable branch. In that regard, when you will build for staging, your app will reflect all the work on it. Then you can build on pre-prod, **it will pull everything you have on your staging branch** and merge it on the `pre-prod` branch. Then you will build for prod, if `pre-prod` is stable enough. Because **building for prod means it will pull from `pre-prod` only** and merge it to `prod`. So **it will be impossible** using this publishing script **to build directly for prod from the staging branch**. Keep that in mind in your review and build flow.
