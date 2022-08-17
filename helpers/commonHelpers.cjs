@@ -37,6 +37,19 @@ const projectConfig = (CONFIG_FILE) => {
     CONFIG_FILE?.appCenter?.appName?.ios,
     CONFIG_FILE?.appCenter?.appName?.android,
     CONFIG_FILE?.appCenter?.token,
+    CONFIG_FILE?.appCenter?.keystorePath,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.provisioningProfile,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.certificate,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.certificatePassword,
+    CONFIG_FILE?.appCenter?.appleBuildSignin['pre-prod']?.provisioningProfile,
+    CONFIG_FILE?.appCenter?.appleBuildSignin['pre-prod']?.certificate,
+    CONFIG_FILE?.appCenter?.appleBuildSignin['pre-prod']?.certificatePassword,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.provisioningProfile,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.certificate,
+    CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.certificatePassword,
+    CONFIG_FILE?.appCenter?.autoIncrementBuildNumber,
+    CONFIG_FILE?.appCenter?.buildFrequency,
+    CONFIG_FILE?.appCenter?.buildAndroidAppBundle,
     // GIT
     CONFIG_FILE?.git?.repoURL,
   ];
@@ -44,7 +57,7 @@ const projectConfig = (CONFIG_FILE) => {
     .every((configConstant) => configConstant !== undefined);
 
   if (!isConfigFileValid) {
-    printErrorConsoleMessage('Your config file has errors please check with the documentation');
+    printErrorConsoleMessage('Your config file is incorrect or has missing mandatory values, please check it with the documentation');
     process.exit(1);
   }
 

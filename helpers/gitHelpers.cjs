@@ -1,11 +1,43 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
-const { printConsoleMessage } = require('./commonHelpers.cjs');
+const { printConsoleMessage, printErrorConsoleMessage } = require('./commonHelpers.cjs');
 const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers.cjs');
 const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers.cjs');
 
 const MAX_CHANGELOG_LENGTH = 3000;
 const CHANGELOG_FILE_PATH = './CHANGELOG.md';
+
+/**
+ * Check if a given branch name exists on origin
+ * @param  {string} branchName
+ * @return {boolean}
+ */
+const checkIfGitBranchExists = (branchName) => {
+  printConsoleMessage(`Checking if branch ${branchName} exists`);
+
+  try {
+    execSync(`git ls-remote --heads origin ${branchName}`).toString('utf-8').trim();
+    printConsoleMessage(`Branch ${branchName} already exists`);
+    return true
+  } catch {
+    printConsoleMessage(`Branch ${branchName} don't exists`);
+    return false;
+  }
+}
+/**
+ * Create branch with given name on remote repository
+ * @param  {string} branchName
+ */
+const createGitBranch = (branchName) => {
+  printConsoleMessage(`Create Branch ${branchName} on origin`);
+  try {
+    execSync(`git checkout -b ${branchName}`);
+    execSync(`git push -u origin ${branchName}`);
+  } catch {
+    printErrorConsoleMessage('Can\'t create git branch, please check your Git configuration or update your config file.');
+    process.exit(1);
+  }
+}
 
 /**
  * Fetch the last git tag and return it, if no tag return the starting version number from CONFIG
@@ -180,6 +212,19 @@ const manageGitFlow = (targetedEnv, CONFIG) => {
   execSync(`git checkout ${CONFIG.git.branches.staging}`);
 };
 
+const manageGitBranches = (CONFIG) => {
+  const {git: {branches}} = CONFIG
+
+  for (const branch of branches) {
+    if (!checkIfGitBranchExists(branches[branch])) {
+      createGitBranch(branches[branch])
+    }
+  }
+  // Checkout back on staging branch
+  execSync(`git checkout ${branches.staging}`);
+}
+
 module.exports = {
   manageGitFlow,
+  manageGitBranches,
 };
