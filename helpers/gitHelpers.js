@@ -1,8 +1,8 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
-const { printConsoleMessage, printErrorConsoleMessage } = require('./commonHelpers.cjs');
-const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers.cjs');
-const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers.cjs');
+const { printConsoleMessage, printErrorConsoleMessage, getConfigObject } = require('./commonHelpers');
+const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers');
+const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers');
 
 const MAX_CHANGELOG_LENGTH = 3000;
 const CHANGELOG_FILE_PATH = './CHANGELOG.md';
@@ -14,22 +14,24 @@ const CHANGELOG_FILE_PATH = './CHANGELOG.md';
  */
 const checkIfGitBranchExists = (branchName) => {
   printConsoleMessage(`Checking if branch ${branchName} exists`);
+  // If branch exists command should print a string from origin with branch name.
+  // Otherwise, return is empty
+  const gitBranchFromOrigin = execSync(`git ls-remote --heads origin ${branchName}`).toString('utf-8').trim();
 
-  try {
-    execSync(`git ls-remote --heads origin ${branchName}`).toString('utf-8').trim();
-    printConsoleMessage(`Branch ${branchName} already exists`);
-    return true
-  } catch {
-    printConsoleMessage(`Branch ${branchName} don't exists`);
+  if (!gitBranchFromOrigin) {
+    printConsoleMessage(`Branch ${branchName} does not exists`);
     return false;
   }
-}
+
+  printConsoleMessage(`Branch ${branchName} already exists`);
+  return true;
+};
 /**
  * Create branch with given name on remote repository
  * @param  {string} branchName
  */
 const createGitBranch = (branchName) => {
-  printConsoleMessage(`Create Branch ${branchName} on origin`);
+  printConsoleMessage(`Create branch ${branchName} on origin`);
   try {
     execSync(`git checkout -b ${branchName}`);
     execSync(`git push -u origin ${branchName}`);
@@ -37,7 +39,7 @@ const createGitBranch = (branchName) => {
     printErrorConsoleMessage('Can\'t create git branch, please check your Git configuration or update your config file.');
     process.exit(1);
   }
-}
+};
 
 /**
  * Fetch the last git tag and return it, if no tag return the starting version number from CONFIG
@@ -57,10 +59,11 @@ const getLatestTagVersionNumber = (startingVersionNumber) => {
  * @param  {String} gitMessage
  * @param  {String} commitSplitMarker
  * @param  {String} newVersionNumber
- * @param  {Object} CONFIG
  * @return {String}
  */
-const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFIG) => {
+const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber) => {
+  const CONFIG = getConfigObject();
+
   if (gitMessage.length > MAX_CHANGELOG_LENGTH) {
     printConsoleMessage(
       'Git message too long, getting changes since last publish.',
@@ -114,8 +117,8 @@ const gitCreateCommitMessage = (
   commitSplitMarker,
   newVersionNumber,
   targetedEnv,
-  CONFIG,
 ) => {
+  const CONFIG = getConfigObject();
   const commitMessageBase = `Publish new ${targetedEnv} version`;
   const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(commitMessageBase);
 
@@ -135,7 +138,8 @@ const gitCreateCommitMessage = (
   }
 };
 
-const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
+const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv) => {
+  const CONFIG = getConfigObject();
   execSync(`git checkout ${CONFIG.git.branches.staging} && git pull`);
 
   const latestTag = getLatestTagVersionNumber(CONFIG.startingVersionNumber);
@@ -176,7 +180,6 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     commitSplitMarker,
     newVersionNumber,
     targetedEnv,
-    CONFIG,
   );
 
   return newVersionNumber;
@@ -212,17 +215,17 @@ const manageGitFlow = (targetedEnv, CONFIG) => {
   execSync(`git checkout ${CONFIG.git.branches.staging}`);
 };
 
-const manageGitBranches = (CONFIG) => {
-  const {git: {branches}} = CONFIG
+const manageGitBranches = () => {
+  const { git: { branches } } = getConfigObject();
 
-  for (const branch of branches) {
+  Object.keys(branches).forEach((branch) => {
     if (!checkIfGitBranchExists(branches[branch])) {
-      createGitBranch(branches[branch])
+      createGitBranch(branches[branch]);
     }
-  }
+  });
   // Checkout back on staging branch
   execSync(`git checkout ${branches.staging}`);
-}
+};
 
 module.exports = {
   manageGitFlow,

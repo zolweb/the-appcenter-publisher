@@ -1,6 +1,6 @@
 const { execSync } = require('child_process');
 const appRootPath = require('app-root-path');
-const { printConsoleMessage } = require('./commonHelpers.cjs');
+const { printConsoleMessage } = require('./commonHelpers.js');
 
 const IS_LINUX = process.platform === 'linux';
 

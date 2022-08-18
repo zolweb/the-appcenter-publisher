@@ -3,18 +3,16 @@
 /* eslint-disable no-console */
 // Imports
 const { prompt } = require('enquirer');
-const appRootPath = require('app-root-path');
-const { projectConfig } = require('./helpers/commonHelpers.cjs');
-const { manageGitFlow } = require('./helpers/gitHelpers.cjs');
-const { triggerAppCenterBuild } = require('./helpers/appCenterHelpers.cjs');
-const [,, ...args] = process.argv;
+const { validateProjectConfig, getConfigObject } = require('./helpers/commonHelpers');
+const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
+const { triggerAppCenterBuild } = require('./helpers/appCenterHelpers');
 
-// eslint-disable-next-line import/no-dynamic-require
-const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+const [, , ...args] = process.argv;
+
 const SCRIPT_PARAMS = {
   INIT_CONFIG: '--init-config',
-  UPDATE_CONFIG: '--update-config'
-}
+  UPDATE_CONFIG: '--update-config',
+};
 
 const deployPromptQuestions = [
   {
@@ -32,7 +30,8 @@ const deployPromptQuestions = [
   },
 ];
 
-const triggerDeployScript = (CONFIG) => {
+const triggerDeployScript = async () => {
+  const CONFIG = getConfigObject();
   try {
     // Get inputs from user
     const { platform, branch } = await prompt(deployPromptQuestions);
@@ -43,30 +42,36 @@ const triggerDeployScript = (CONFIG) => {
   } catch {
     process.exit(1);
   }
-}
+};
 
-const triggerInitConfigScript = (CONFIG) => {
+const triggerInitConfigScript = () => {
+  const CONFIG = getConfigObject();
   // Check if all branches exists on repo otherwise create them
-  manageGitBranches(CONFIG)
+  manageGitBranches(CONFIG);
   // Use Appcenter API to create groups
 
   // Use AppCenter API to create the config for each git branch
-}
-
-const triggerUpdateConfigScript = (CONFIG) => {}
-
-const deployCLI = async () => {
-  // Get config file from App root directory and verify it
-  const CONFIG = projectConfig(CONFIG_FILE);
-  // Check if user specified arguments 
-  const isInitConfig = args.includes(SCRIPT_PARAMS.INIT_CONFIG)
-  const isUpdateConfig = args.includes(SCRIPT_PARAMS.UPDATE_CONFIG)
-
-  if (isInitConfig) return triggerInitConfigScript(CONFIG)
-
-  if (isUpdateConfig) return triggerUpdateConfigScript(CONFIG)
-
-  return triggerDeployScript(CONFIG)
 };
 
-deployCLI();
+const triggerUpdateConfigScript = () => { };
+
+async function startScript() {
+  // First need to check if poject config file is valid
+  validateProjectConfig();
+  // Check if user specified arguments
+  const isInitConfig = args.includes(SCRIPT_PARAMS.INIT_CONFIG);
+  const isUpdateConfig = args.includes(SCRIPT_PARAMS.UPDATE_CONFIG);
+
+  console.log('ARGS : ', args);
+  console.log('isInitConfig ?', isInitConfig);
+  console.log('isUpdateConfig ?', isUpdateConfig);
+
+  if (isInitConfig) return triggerInitConfigScript();
+
+  if (isUpdateConfig) return triggerUpdateConfigScript();
+
+  // return triggerDeployScript(CONFIG)
+  return undefined;
+}
+
+startScript();
