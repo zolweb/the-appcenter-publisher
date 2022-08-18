@@ -1,7 +1,12 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
 const ora = require('ora');
-const { postAppCenterTriggerBuild, generateAppCenterBuildURL, getAppCenterBuildInfo } = require('../services/appCenterService');
+const {
+  postAppCenterTriggerBuild,
+  generateAppCenterBuildURL,
+  getAppCenterBuildInfo,
+  postAppCenterNewDistributionGroup,
+} = require('../services/appCenterService');
 const { getConfigObject } = require('./commonHelpers');
 
 const APP_CENTER_BUILD_STATUS = {
@@ -88,6 +93,44 @@ const triggerAppCenterBuild = async (platformList, branch) => {
   }, 30000);
 };
 
+const createAppCenterDistributionGroups = async () => {
+  const CONFIG = getConfigObject();
+  const DISTRIBUTION_GROUPS_NAMES = ['Staging', 'Preprod'];
+
+  for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
+    for (const groupName of DISTRIBUTION_GROUPS_NAMES) {
+      // Create console string to avoid too much repetition
+      const distributionGroupConsoleString = `AppCenter ${groupName} distribution group for ${CONFIG.appCenter.appName[applicationPlatform]}`;
+      // Init Ora loader
+      const distributionGroupLoader = ora().start(`\x1b[1mCreating ${distributionGroupConsoleString}\x1b[0m\n`);
+      // Trigger API Call
+      try {
+        const distributionGroupQueryRes = await postAppCenterNewDistributionGroup(
+          CONFIG.appCenter.appName[applicationPlatform],
+          CONFIG.appCenter.userName,
+          {
+            is_public: true,
+            name: groupName,
+          },
+        );
+
+        if ([200, 201].includes(distributionGroupQueryRes.status)) {
+          distributionGroupLoader.succeed(`\x1b[1m${distributionGroupConsoleString} created with success !\x1b[0m`);
+        }
+      } catch (error) {
+        if (error.response.status === 409) {
+          distributionGroupLoader.succeed(`\x1b[1m${distributionGroupConsoleString} already exists, skipping\x1b[0m`);
+        } else {
+          distributionGroupLoader.fail(`Could not create ${distributionGroupConsoleString}\n`);
+          // eslint-disable-next-line no-console
+          console.error('ERR ', error.response.status);
+        }
+      }
+    }
+  }
+};
+
 module.exports = {
   triggerAppCenterBuild,
+  createAppCenterDistributionGroups,
 };

@@ -5,7 +5,7 @@
 const { prompt } = require('enquirer');
 const { validateProjectConfig, getConfigObject } = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
-const { triggerAppCenterBuild } = require('./helpers/appCenterHelpers');
+const { triggerAppCenterBuild, createAppCenterDistributionGroups } = require('./helpers/appCenterHelpers');
 
 const [, , ...args] = process.argv;
 
@@ -45,11 +45,10 @@ const triggerDeployScript = async () => {
 };
 
 const triggerInitConfigScript = () => {
-  const CONFIG = getConfigObject();
   // Check if all branches exists on repo otherwise create them
-  manageGitBranches(CONFIG);
+  manageGitBranches();
   // Use Appcenter API to create groups
-
+  createAppCenterDistributionGroups();
   // Use AppCenter API to create the config for each git branch
 };
 

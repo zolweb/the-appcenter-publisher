@@ -13,7 +13,7 @@ const APPCENTER_API_CLIENT = axios.create({
  * @param  {String} appName
  * @param  {String} userName
  * @param  {String} gitBranch
- * @return {String} API URL
+ * @return {Promise<Axios>}
  */
 const postAppCenterTriggerBuild = (appName, userName, gitBranch) => APPCENTER_API_CLIENT.post(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/builds`);
 
@@ -21,9 +21,17 @@ const postAppCenterTriggerBuild = (appName, userName, gitBranch) => APPCENTER_AP
   * @param  {String} appName
   * @param  {String} userName
   * @param  {Number} buildId
-  * @return {String} API URL
+  * @return {Promise<Axios>}
   */
 const getAppCenterBuildInfo = (appName, userName, buildId) => APPCENTER_API_CLIENT.get(`/api/v0.1/apps/${userName}/${appName}/builds/${buildId}`);
+
+/**
+  * @param  {String} appName
+  * @param  {String} userName
+  * @param  {{is_public:Boolean, name:String}} groupInfo
+  * @return {Promise<Axios>}
+  */
+const postAppCenterNewDistributionGroup = (appName, userName, groupInfo) => APPCENTER_API_CLIENT.post(`/api/v0.1/apps/${userName}/${appName}/distribution_groups`, groupInfo);
 
 /**
   * @param  {String} appName
@@ -38,4 +46,5 @@ module.exports = {
   postAppCenterTriggerBuild,
   generateAppCenterBuildURL,
   getAppCenterBuildInfo,
+  postAppCenterNewDistributionGroup,
 };
