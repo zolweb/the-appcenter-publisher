@@ -1,11 +1,17 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
+const fs = require('fs');
 const ora = require('ora');
+const { prompt } = require('enquirer');
+const appRootPath = require('app-root-path');
+// eslint-disable-next-line import/no-dynamic-require
+const PACKAGEJSON_FILE = require(`${appRootPath}/package.json`);
 const {
   postAppCenterTriggerBuild,
   generateAppCenterBuildURL,
   getAppCenterBuildInfo,
   postAppCenterNewDistributionGroup,
+  postAppCenterBranchConfig,
 } = require('../services/appCenterService');
 const { getConfigObject } = require('./commonHelpers');
 
@@ -14,6 +20,16 @@ const APP_CENTER_BUILD_STATUS = {
   PROGRESS: 'inProgress',
   CANCELLING: 'cancelling',
   COMPLETED: 'completed',
+};
+
+const APP_CENTER_BRANCH_CONFIG_TRIGGER = {
+  MANUAL: 'manual',
+  AUTO: 'continuous',
+};
+
+const APP_CENTER_ENV_GROUP_NAMES = {
+  staging: 'Staging',
+  preprod: 'Preprod',
 };
 
 /**
@@ -93,9 +109,41 @@ const triggerAppCenterBuild = async (platformList, branch) => {
   }, 30000);
 };
 
+/**
+ * Prompt the user to specify Keystore informations
+ * @return  {Promise<{keyAlias:String, keyPassword:String, keystorePassword:String}>}
+ */
+const manageAndroidKeyStore = async () => {
+  const keystorePromptQuestions = [
+    {
+      type: 'password',
+      name: 'keyAlias',
+      message: 'You defined a path for your Android Keystore, please provide the key alias : ',
+    },
+    {
+      type: 'password',
+      name: 'keyPassword',
+      message: 'The key password : ',
+    },
+    {
+      type: 'password',
+      name: 'keystorePassword',
+      message: 'And the keystore password : ',
+    },
+  ];
+  const results = await prompt(keystorePromptQuestions);
+
+  return results;
+};
+
+// EXPORTED METHODS
+
 const createAppCenterDistributionGroups = async () => {
   const CONFIG = getConfigObject();
-  const DISTRIBUTION_GROUPS_NAMES = ['Staging', 'Preprod'];
+  const DISTRIBUTION_GROUPS_NAMES = [
+    APP_CENTER_ENV_GROUP_NAMES.staging,
+    APP_CENTER_ENV_GROUP_NAMES.preprod,
+  ];
 
   for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
     for (const groupName of DISTRIBUTION_GROUPS_NAMES) {
@@ -130,7 +178,106 @@ const createAppCenterDistributionGroups = async () => {
   }
 };
 
+const updateAppCenterBranchConfig = async () => {
+  const CONFIG = getConfigObject();
+  let keystoreSecretInformation = {};
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.provisioningProfile,
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.certificate,
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.['pre-prod']?.provisioningProfile,
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.['pre-prod']?.certificate,
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.provisioningProfile,
+  // CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.certificate,
+
+  if (CONFIG?.appCenter?.keystorePath) {
+    keystoreSecretInformation = await manageAndroidKeyStore();
+    const keystoreFile = fs.readFileSync(CONFIG?.appCenter?.keystorePath);
+    const keystoreEncoded = keystoreFile.toString('base64');
+    const keystoreFilename = CONFIG?.appCenter?.keystorePath.split('/').pop();
+    keystoreSecretInformation = { ...keystoreSecretInformation, keystoreEncoded, keystoreFilename };
+  }
+
+  const appCenterConfigGlobal = {
+    badgeIsEnabled: false, // Enable the build status badge
+    trigger: APP_CENTER_BRANCH_CONFIG_TRIGGER.MANUAL, // build triggered auto or manual
+    environmentVariables: [
+      {
+        name: 'TEST_CONFIG',
+        value: 'http://testconfig',
+      },
+    ],
+    toolsets: {},
+    distribution: {
+      destinations: [], // Group IDs
+      destinationType: 'groups', // change for prod
+      isSilent: false,
+    },
+  };
+  const appCenterConfigToolsetJavascript = {
+    nodeVersion: '16.x',
+    packageJsonPath: 'package.json',
+    reactNativeVersion: PACKAGEJSON_FILE.dependencies['react-native'],
+    runTests: false,
+  };
+  const appCenterConfigToolsetPlatforms = {
+    android: {
+      buildBundle: CONFIG.appCenter.buildAndroidAppBundle,
+      buildVariant: 'release',
+      gradleWrapperPath: 'android/gradlew',
+      module: 'app',
+      runLint: false,
+      runTests: false,
+      ...keystoreSecretInformation,
+    },
+    ios: {
+      buildVariant: 'release',
+      module: 'app',
+      runLint: false,
+      runTests: false,
+    },
+  };
+
+  for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
+    for (const branchEnvironment of Object.keys(CONFIG.git.branches)) {
+      const envLoaderString = `configuration for branch ${CONFIG.git.branches[branchEnvironment]} for ${CONFIG.appCenter.appName[applicationPlatform]}`;
+      // Init Ora loader
+      const branchConfigLoader = ora().start(`\x1b[1mSending ${envLoaderString}\x1b[0m\n`);
+      // Trigger API Call
+      try {
+        const branchConfigQueryRes = await postAppCenterBranchConfig(
+          CONFIG.appCenter.appName[applicationPlatform],
+          CONFIG.appCenter.userName,
+          CONFIG.git.branches[branchEnvironment],
+          {
+            ...appCenterConfigGlobal,
+            toolsets: {
+              javascript: appCenterConfigToolsetJavascript,
+              android: appCenterConfigToolsetPlatforms.android,
+            },
+          },
+        );
+
+        if ([200, 201].includes(branchConfigQueryRes.status)) {
+          branchConfigLoader.succeed(`\x1b[1m${envLoaderString} created with success !\x1b[0m`);
+        }
+      } catch (error) {
+        branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
+        // eslint-disable-next-line no-console
+        console.error('ERR ', error.response.status, error.response.data);
+      }
+    }
+  }
+
+  console.log('PRINT FULL CONFIG : ', {
+    ...appCenterConfigGlobal,
+    toolsets: {
+      javascript: appCenterConfigToolsetJavascript,
+      android: appCenterConfigToolsetPlatforms.android,
+    },
+  });
+};
+
 module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
+  updateAppCenterBranchConfig,
 };

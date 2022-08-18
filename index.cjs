@@ -5,7 +5,7 @@
 const { prompt } = require('enquirer');
 const { validateProjectConfig, getConfigObject } = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
-const { triggerAppCenterBuild, createAppCenterDistributionGroups } = require('./helpers/appCenterHelpers');
+const { triggerAppCenterBuild, createAppCenterDistributionGroups, updateAppCenterBranchConfig } = require('./helpers/appCenterHelpers');
 
 const [, , ...args] = process.argv;
 
@@ -44,12 +44,13 @@ const triggerDeployScript = async () => {
   }
 };
 
-const triggerInitConfigScript = () => {
+const triggerInitConfigScript = async () => {
   // Check if all branches exists on repo otherwise create them
   manageGitBranches();
   // Use Appcenter API to create groups
-  createAppCenterDistributionGroups();
+  await createAppCenterDistributionGroups();
   // Use AppCenter API to create the config for each git branch
+  await updateAppCenterBranchConfig();
 };
 
 const triggerUpdateConfigScript = () => { };
@@ -60,10 +61,6 @@ async function startScript() {
   // Check if user specified arguments
   const isInitConfig = args.includes(SCRIPT_PARAMS.INIT_CONFIG);
   const isUpdateConfig = args.includes(SCRIPT_PARAMS.UPDATE_CONFIG);
-
-  console.log('ARGS : ', args);
-  console.log('isInitConfig ?', isInitConfig);
-  console.log('isUpdateConfig ?', isUpdateConfig);
 
   if (isInitConfig) return triggerInitConfigScript();
 

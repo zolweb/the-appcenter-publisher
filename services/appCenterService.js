@@ -37,6 +37,14 @@ const postAppCenterNewDistributionGroup = (appName, userName, groupInfo) => APPC
   * @param  {String} appName
   * @param  {String} userName
   * @param  {String} gitBranch
+  * @param  {Object} appCenterConfig
+  * @return {Promise<Axios>}
+  */
+const postAppCenterBranchConfig = (appName, userName, gitBranch, appCenterConfig) => APPCENTER_API_CLIENT.post(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/config`, appCenterConfig);
+/**
+  * @param  {String} appName
+  * @param  {String} userName
+  * @param  {String} gitBranch
   * @param  {Number} buildId
   * @return {String} APP CENTER build URL
   */
@@ -47,4 +55,5 @@ module.exports = {
   generateAppCenterBuildURL,
   getAppCenterBuildInfo,
   postAppCenterNewDistributionGroup,
+  postAppCenterBranchConfig,
 };
