@@ -66,8 +66,7 @@ async function startScript() {
 
   if (isUpdateConfig) return triggerUpdateConfigScript();
 
-  // return triggerDeployScript(CONFIG)
-  return undefined;
+  return triggerDeployScript();
 }
 
 startScript();
