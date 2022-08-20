@@ -1,6 +1,7 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
 const fs = require('fs');
+const readline = require('readline');
 const ora = require('ora');
 const { prompt } = require('enquirer');
 const appRootPath = require('app-root-path');
@@ -12,8 +13,10 @@ const {
   getAppCenterBuildInfo,
   postAppCenterNewDistributionGroup,
   postAppCenterBranchConfig,
+  postAppCenterFileAsset,
+  getAppCenterDistributionGroups,
 } = require('../services/appCenterService');
-const { getConfigObject } = require('./commonHelpers');
+const { getConfigObject, printConsoleMessage } = require('./commonHelpers');
 
 const APP_CENTER_BUILD_STATUS = {
   NOTSTARTED: 'notStarted',
@@ -29,8 +32,25 @@ const APP_CENTER_BRANCH_CONFIG_TRIGGER = {
 
 const APP_CENTER_ENV_GROUP_NAMES = {
   staging: 'Staging',
-  preprod: 'Preprod',
+  'pre-prod': 'Preprod',
 };
+
+const APP_CENTER_DESTINATION_TYPE_ENV = {
+  staging: 'groups',
+  'pre-prod': 'groups',
+  prod: 'store',
+};
+
+/**
+ * Get Distribution Group ID from the list depending on the environment
+ * @param  {String} branchEnvironment
+ * @param  {Array<AppCenterDistributionGroup>} distributionGroupsList
+ * @return {String} App Center Distribution Group ID
+ */
+const getDistributionGroupIdFromEnv = (branchEnvironment, distributionGroupsList = []) => (
+  distributionGroupsList.find(
+    (group) => group.name === APP_CENTER_ENV_GROUP_NAMES[branchEnvironment],
+  )?.id || '');
 
 /**
  * Make an API call on AppCenter to trigger the builds via curl command
@@ -136,13 +156,123 @@ const manageAndroidKeyStore = async () => {
   return results;
 };
 
+/**
+ * Promp user for the Apple certificate password
+ * @return  {Promise<{certificatePassword:String}>}
+ */
+const askForAppleCertificatePassord = async () => {
+  const certificatePromptQuestions = [
+    {
+      type: 'password',
+      name: 'certificatePassword',
+      message: 'You defined a path for your Apple Certificate, please provide the password : ',
+    },
+  ];
+
+  const results = await prompt(certificatePromptQuestions);
+  return results;
+};
+
+/**
+ * Manage Apple certificate password and return config object
+ * @return  {Promise<{keyAlias:String, keyPassword:String, keystorePassword:String}>}
+ */
+// const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
+//   const CONFIG = getConfigObject();
+//   // Upload certificate to AppCenter
+//   const uploadCertificateLoader = ora().start(`\x1b[1mUploading Apple Certificate and Provisioning Profile for ${branchEnvironment}\x1b[0m\n`);
+//   try {
+//     const certificateAssetRes = await postAppCenterFileAsset(
+//       CONFIG.appCenter.appName.ios,
+//       CONFIG.appCenter.userName,
+//       CONFIG.appCenter.appleCertificatePath,
+//       'certif',
+//     );
+
+//     const profileAssetRes = await postAppCenterFileAsset(
+//       CONFIG.appCenter.appName.ios,
+//       CONFIG.appCenter.userName,
+//       CONFIG.appCenter.appleProvisioningProfilePath[branchEnvironment],
+//       'provision',
+//     );
+
+//     uploadCertificateLoader.succeed(`\x1b[1mSuccessfuly uploaded Apple Certificate and Provisioning Profile for ${branchEnvironment}\x1b[0m`);
+//     return {
+//       certificateFilename: CONFIG.appCenter.appleCertificatePath.split('/').pop(),
+//       certificateUploadId: certificateAssetRes.id,
+//       provisioningProfileFilename: CONFIG.appCenter.appleProvisioningProfilePath[branchEnvironment].split('/').pop(),
+//       provisioningProfileUploadId: profileAssetRes.id,
+//     };
+//   } catch (error) {
+//     uploadCertificateLoader.fail('Could not create upload Apple Certificate and Provisioning Profile\n');
+//     // eslint-disable-next-line no-console
+//     console.error('ERR ', error.response.status, error.response.data);
+//     return {};
+//   }
+// };
+
+/**
+ * Extract BlueprintIdentifier from xcode file
+ * @return  {String}
+ */
+const getXCodeBlueprintIdentifier = () => {
+  const blueprintName = PACKAGEJSON_FILE.name;
+  const xcschemeFilePath = `ios/${blueprintName}.xcodeproj/xcshareddata/xcschemes/${blueprintName}.xcscheme`;
+  // Look for the BuildAction in xcschemeFilePath
+  const file = fs.readFileSync(xcschemeFilePath, { encoding: 'utf8' });
+  const buildActionBlockString = file.match(/<BuildAction([^`]*)BuildAction>/)[0];
+  // Extract value of BlueprintIdentifier
+  const blueprintIdentifier = buildActionBlockString.match(/BlueprintIdentifier = "(.*?)"/)[1];
+
+  return blueprintIdentifier;
+};
+
+const manageEnvironmentVariables = async () => {
+  try {
+    printConsoleMessage('Copy Environment variables from env.js file');
+
+    const postCloneContent = `#!/usr/bin/env bash
+
+echo "==============================================="
+echo "SETTING env.js FILE"
+echo "==============================================="
+cat > ./env.js <<EOL
+[variables]
+EOL
+cat ./env.js
+    `;
+    const envFileStream = fs.createReadStream(`${appRootPath}/env.js`);
+    let variablesToInsert = [];
+
+    const readLineInterface = readline.createInterface({
+      input: envFileStream,
+      crlfDelay: Infinity,
+    });
+
+    for await (const line of readLineInterface) {
+      // Each line in input.txt will be successively available here as `line`.
+      const extractedVariable = line.match(/const([^`]*)=/)?.[1]?.trim();
+      if (extractedVariable) {
+        variablesToInsert = variablesToInsert.concat(`export const ${extractedVariable} = "\${${extractedVariable}}";\n`);
+      }
+    }
+
+    const fileContent = postCloneContent.replace(/\[variables\]/, variablesToInsert.join(''));
+    fs.writeFileSync('appcenter-post-clone.sh', fileContent);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(error);
+    printConsoleMessage('No Environment variables detected');
+  }
+};
+
 // EXPORTED METHODS
 
 const createAppCenterDistributionGroups = async () => {
   const CONFIG = getConfigObject();
   const DISTRIBUTION_GROUPS_NAMES = [
     APP_CENTER_ENV_GROUP_NAMES.staging,
-    APP_CENTER_ENV_GROUP_NAMES.preprod,
+    APP_CENTER_ENV_GROUP_NAMES['pre-prod'],
   ];
 
   for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
@@ -181,12 +311,9 @@ const createAppCenterDistributionGroups = async () => {
 const updateAppCenterBranchConfig = async () => {
   const CONFIG = getConfigObject();
   let keystoreSecretInformation = {};
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.provisioningProfile,
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.staging?.certificate,
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.['pre-prod']?.provisioningProfile,
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.['pre-prod']?.certificate,
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.provisioningProfile,
-  // CONFIG_FILE?.appCenter?.appleBuildSignin?.prod?.certificate,
+  let appleSecretInformation = {};
+
+  await manageEnvironmentVariables();
 
   if (CONFIG?.appCenter?.keystorePath) {
     keystoreSecretInformation = await manageAndroidKeyStore();
@@ -194,6 +321,10 @@ const updateAppCenterBranchConfig = async () => {
     const keystoreEncoded = keystoreFile.toString('base64');
     const keystoreFilename = CONFIG?.appCenter?.keystorePath.split('/').pop();
     keystoreSecretInformation = { ...keystoreSecretInformation, keystoreEncoded, keystoreFilename };
+  }
+
+  if (CONFIG?.appCenter?.appleCertificatePath) {
+    appleSecretInformation = await askForAppleCertificatePassord();
   }
 
   const appCenterConfigGlobal = {
@@ -206,11 +337,6 @@ const updateAppCenterBranchConfig = async () => {
       },
     ],
     toolsets: {},
-    distribution: {
-      destinations: [], // Group IDs
-      destinationType: 'groups', // change for prod
-      isSilent: false,
-    },
   };
   const appCenterConfigToolsetJavascript = {
     nodeVersion: '16.x',
@@ -229,51 +355,87 @@ const updateAppCenterBranchConfig = async () => {
       ...keystoreSecretInformation,
     },
     ios: {
-      buildVariant: 'release',
-      module: 'app',
-      runLint: false,
-      runTests: false,
+      archiveConfiguration: 'Release',
+      podfilePath: 'ios/Podfile',
+      projectOrWorkspacePath: `ios/${PACKAGEJSON_FILE.name}.xcworkspace`, // path to .xcworkspace
+      scheme: PACKAGEJSON_FILE.name, // name from package.json OR BlueprintName
+      targetToArchive: getXCodeBlueprintIdentifier(),
+      // xcodeProjectSha: '6333d75ada3f05fe49dd86191f9f0b51535a4452',
+      xcodeVersion: '13.4.1',
+      ...appleSecretInformation,
     },
   };
 
   for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
+    // Get App Center application distribution groups
+    const platformDistributionGroups = await getAppCenterDistributionGroups(
+      CONFIG.appCenter.appName[applicationPlatform],
+      CONFIG.appCenter.userName,
+    );
+
     for (const branchEnvironment of Object.keys(CONFIG.git.branches)) {
       const envLoaderString = `configuration for branch ${CONFIG.git.branches[branchEnvironment]} for ${CONFIG.appCenter.appName[applicationPlatform]}`;
+      let toolsets = {
+        javascript: appCenterConfigToolsetJavascript,
+        distribution: {
+          destinations: [
+            getDistributionGroupIdFromEnv(branchEnvironment, platformDistributionGroups?.data),
+          ], // Group IDs
+          destinationType: APP_CENTER_DESTINATION_TYPE_ENV[branchEnvironment],
+          isSilent: false,
+        },
+      };
+      // Get distribution group
+
+      // Format toolsets for Android platform
+      if (applicationPlatform === 'android') {
+        toolsets = {
+          ...toolsets,
+          android: appCenterConfigToolsetPlatforms.android,
+        };
+      }
+      // Format toolsets for iOS platform
+      if (applicationPlatform === 'ios') {
+        // const appleSecretsConfig = await manageAppleCertificateAndProfiles(branchEnvironment);
+
+        toolsets = {
+          ...toolsets,
+          xcode: {
+            ...appCenterConfigToolsetPlatforms.ios,
+            // ...appleSecretsConfig,
+          },
+        };
+      }
+      const appCenterConfigToSend = {
+        ...appCenterConfigGlobal,
+        toolsets,
+      };
       // Init Ora loader
       const branchConfigLoader = ora().start(`\x1b[1mSending ${envLoaderString}\x1b[0m\n`);
       // Trigger API Call
       try {
+        // Send API Call
         const branchConfigQueryRes = await postAppCenterBranchConfig(
           CONFIG.appCenter.appName[applicationPlatform],
           CONFIG.appCenter.userName,
           CONFIG.git.branches[branchEnvironment],
-          {
-            ...appCenterConfigGlobal,
-            toolsets: {
-              javascript: appCenterConfigToolsetJavascript,
-              android: appCenterConfigToolsetPlatforms.android,
-            },
-          },
+          appCenterConfigToSend,
         );
 
         if ([200, 201].includes(branchConfigQueryRes.status)) {
           branchConfigLoader.succeed(`\x1b[1m${envLoaderString} created with success !\x1b[0m`);
         }
       } catch (error) {
+        if (error.response.status === 409) {
+          branchConfigLoader.fail(`A configuration for ${envLoaderString} already exists, please update instead.\n`);
+        }
+
         branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
         // eslint-disable-next-line no-console
         console.error('ERR ', error.response.status, error.response.data);
       }
     }
   }
-
-  console.log('PRINT FULL CONFIG : ', {
-    ...appCenterConfigGlobal,
-    toolsets: {
-      javascript: appCenterConfigToolsetJavascript,
-      android: appCenterConfigToolsetPlatforms.android,
-    },
-  });
 };
 
 module.exports = {
