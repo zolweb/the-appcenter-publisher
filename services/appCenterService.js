@@ -53,6 +53,15 @@ const getAppCenterDistributionGroups = (appName, userName) => APPCENTER_API_CLIE
 /**
   * @param  {String} appName
   * @param  {String} userName
+  * @param  {String} gitBranch
+  * @param  {String} platform Android | iOS
+  * @return {Promise<Axios>}
+  */
+const getAppCenterAppToolsets = (appName, userName, gitBranch, platform) => APPCENTER_API_CLIENT.get(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/toolset_projects?os=${platform}&platform=React-Native`);
+
+/**
+  * @param  {String} appName
+  * @param  {String} userName
   * @param  {String} filePath
   * @param  {String} type - provision|certif
   * @return {Promise<UploadInformation>}
@@ -60,7 +69,7 @@ const getAppCenterDistributionGroups = (appName, userName) => APPCENTER_API_CLIE
 const postAppCenterFileAsset = async (appName, userName, filePath, type) => {
   const fileStats = fs.statSync(filePath);
   const fileName = filePath.split('/').pop();
-  const file = fs.readFileSync(filePath);
+  const file = fs.readFileSync(filePath, 'binary');
   const contentType = {
     provision: 'application/x-apple-aspen-mobileprovision',
     certif: 'application/x-pkcs12',
@@ -70,21 +79,18 @@ const postAppCenterFileAsset = async (appName, userName, filePath, type) => {
     const fileAssetRes = await APPCENTER_API_CLIENT.post(`/api/v0.1/apps/${userName}/${appName}/file_asset`);
     // Then we send the metadata thanks to the information from the previous call
     const fileMetadataRes = await axios.post(`${fileAssetRes.data.uploadDomain}/upload/set_metadata/${fileAssetRes.data.id}?file_name=${fileName}&file_size=${fileStats.size}&content_type=${contentType[type]}&token=${fileAssetRes.data.urlEncodedToken}`);
-    console.log('METADATA RES :', fileMetadataRes.data);
     // We start sending the chunks of bits with the maximum size given previously
-    const resres = await axios.post(
+    await axios.post(
       `${fileAssetRes.data.uploadDomain}/upload/upload_chunk/${fileAssetRes.data.id}?block_number=${fileMetadataRes.data.blob_partitions}&token=${fileAssetRes.data.urlEncodedToken}`,
-      file.toString('base64'),
+      file,
       {
         headers: {
           'Content-Type': 'application/x-binary',
         },
       },
     );
-    console.log('RES UPLOAD CONFIG:', resres.config);
     // We tell the upload service that the upload is finished
-    const finishres = await axios.post(`${fileAssetRes.data.uploadDomain}/upload/finished/${fileAssetRes.data.id}?token=${fileAssetRes.data.urlEncodedToken}`);
-    console.log('FINISH UPLOAD :', finishres.data);
+    await axios.post(`${fileAssetRes.data.uploadDomain}/upload/finished/${fileAssetRes.data.id}?token=${fileAssetRes.data.urlEncodedToken}`);
     return {
       id: fileAssetRes.data.id,
     };
@@ -112,4 +118,5 @@ module.exports = {
   postAppCenterBranchConfig,
   postAppCenterFileAsset,
   getAppCenterDistributionGroups,
+  getAppCenterAppToolsets,
 };
