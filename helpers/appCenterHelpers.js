@@ -218,22 +218,6 @@ const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
 };
 
 /**
- * Extract BlueprintIdentifier from xcode file
- * @return  {String}
- */
-// const getXCodeBlueprintIdentifier = () => {
-//   const blueprintName = PACKAGEJSON_FILE.name;
-//   const xcschemeFilePath = `ios/${blueprintName}.xcodeproj/xcshareddata/xcschemes/${blueprintName}.xcscheme`;
-//   // Look for the BuildAction in xcschemeFilePath
-//   const file = fs.readFileSync(xcschemeFilePath, { encoding: 'utf8' });
-//   const buildActionBlockString = file.match(/<BuildAction([^`]*)BuildAction>/)[0];
-//   // Extract value of BlueprintIdentifier
-//   const blueprintIdentifier = buildActionBlockString.match(/BlueprintIdentifier = "(.*?)"/)[1];
-
-//   return blueprintIdentifier;
-// };
-
-/**
  * Get environment variables from env.js file and create or edit appcenter-post-clone.sh file
  * @return  {Array<String>} Array of extracted env variable names
  */
@@ -289,6 +273,12 @@ const getDistributionToolsetsConfig = async (branchEnvironment, platformDistribu
   },
 });
 
+/**
+ * Get the base toolsets config object from App Center depending on the OS
+ * @param  {String} branchEnvironment
+ * @param  {String} applicationPlatform
+ * @return {Object} App Center Toolset config object
+ */
 const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) => {
   const toolsetsLoaderString = `project information for branch ${CONFIG.git.branches[branchEnvironment]} for ${CONFIG.appCenter.appName[applicationPlatform]}`;
   // Init Ora loader
@@ -315,6 +305,15 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
   return undefined;
 };
 
+/**
+ * Get the Android toolsets config object with every requirements from App Center
+ * @param  {{keystoreEncoded:Base64,
+ * keystoreFilename:String,
+ * keyAlias:String,
+ * keyPassword:String,
+ * keystorePassword:String}} keystoreSecretInformation
+ * @return {Object} App Center Android Toolset config object
+ */
 const getAndroidToolsetsConfig = async (keystoreSecretInformation) => ({
   android: {
     buildBundle: CONFIG.appCenter.buildAndroidAppBundle,
@@ -328,6 +327,13 @@ const getAndroidToolsetsConfig = async (keystoreSecretInformation) => ({
   },
 });
 
+/**
+ * Get the Android toolsets config object with every requirements from App Center
+ * @param  {String} branchEnvironment
+ * @param  {{certificatePassword:String}} appleSecretInformation
+ * @param  {object} projectConfigFromAppCenter
+ * @return {object} App Center XCode Toolset config object
+ */
 const getXcodeToolsetsConfig = async (
   branchEnvironment,
   appleSecretInformation,
@@ -356,6 +362,14 @@ const getXcodeToolsetsConfig = async (
   };
 };
 
+/**
+ * Send the previously built App Center Config object to the API
+ * @param  {String} branchEnvironment
+ * @param  {string} applicationPlatform
+ * @param  {object} toolsets
+ * @param  {array<string>} environmentVariables
+ * @return
+ */
 const sendAppcenterBranchConfig = async (
   branchEnvironment,
   applicationPlatform,
@@ -457,9 +471,10 @@ const updateAppCenterBranchConfig = async () => {
 
   const environmentVariables = await manageEnvironmentVariables();
 
-  // Iterate through the config platform (ios | android) and get the App Center Application's name
+  // Iterate through the config platform application Name object keys to get
+  // the platform defined by the publishrc file (ios | android)
   for (const applicationPlatform of Object.keys(CONFIG.appCenter.appName)) {
-    // Get App Center application distribution groups
+    // Get App Center application distribution groups depending on the application name
     const platformDistributionGroupsRes = await getAppCenterDistributionGroups(
       CONFIG.appCenter.appName[applicationPlatform],
       CONFIG.appCenter.userName,
