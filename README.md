@@ -144,3 +144,14 @@ git:prod // Pull directly from your work on pre-prod, tag a new version, generat
 appcenter:Stores // When configured, your builds will be published on Google Beta & Testflight to have a last check before going to production
 ```
 Once you will be using the script you won't be able to skip a step because each step get its work from a specific branch and in this strict order. It enforce QA on each different environments possible and once you will be set for production you should be at peace with yourself.
+
+### How the auto-versionning works ?
+
+Thanks to your commit messages pre-fixes the script will be able de auto-generate a changelog and auto-manage your version number. 
+```
+[major version].[release version].[features and fixes between releases]
+       ↓                 ↓                          ↓
+manually set in  increment at each     count each feature and fix commit
+  .publishrc      new production        since the last production builds
+                     build
+```
