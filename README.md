@@ -4,26 +4,22 @@ This script ease the process of publishing React Native builds with Microsoft Ap
 
 ## How to install
 
-```
+```bash
 yarn add -D zol-msappcenter-publish
 ```
 
-Then in your `package.json` add
+## Getting Started
 
-```
-"scripts": {
-  ...
-  "appcenter:publish": "./node_modules/zol-msappcenter-publish/index.cjs"
-},
-```
+### App Center configuration
 
-Finally in the root directory of your project create a `.publishrc.js`, this will be your script config file.
+First things first, you will need to have created both of your applications (Android and iOS) on your App Center account. We highly recommand to suffix your application name with the OS like `myawesomeapp-android` or `myawesomeapp-ios`. Then don't forget to link your git repository to it.  
+That's it for the App Center part of it.
 
-## Config file
+### Create the config file
 
-In order for the script to run you will need the basic configuration :
+In order for the script to run you will need to create a `.publishrc` file at the root of your React-Native project. You can go with this basic mandatory configuration. Or, if you want more depth and customization, see further down for the full possibilities.
 
-```
+```javascript
 module.exports = {
   appCenter: {
     userName: 'my_username',
@@ -32,6 +28,8 @@ module.exports = {
       ios: 'ios_app_name',
       android: 'android_app_name',
     },
+    autoIncrementBuildNumber: true,
+    buildAndroidAppBundle: 'prod,
   },
   git: {
     repoURL: 'https://gitlab.com/[my_team]/[my_project]/'
@@ -39,18 +37,44 @@ module.exports = {
 }
 ```
 
-Surely you can extend this config file with
+### Add an entry in your package.json
 
+In your `package.json` add a script entry to ease the process of running the script.
+
+```JSON
+"scripts": {
+  ...
+  "appcenter:publish": "./node_modules/zol-msappcenter-publish/index.cjs"
+},
 ```
+
+### Run the initialisation process
+
+Then before started creating builds like crazy, one last step is to run in your terminal `yarn appcenter:publish --init-config`. Depending on your configuration file it may ask you some questions to complete the process of setting-up your environment.  
+
+## Publishrc configuration options
+
+You can go with the basic configuration or further customize your building process. Read along for an exemple of a full `.publishrc` file :
+
+```javascript
 module.exports = {
   startingVersionNumber: '1.0.0', // This number will be used as versionning starting point
   appCenter: {
     userName: 'my_username',
     token: 'my_token',
     appName: {
-      ios: 'ios_app_name',
-      android: 'android_app_name',
+      ios: 'appname-ios',
+      android: 'appname-android',
     },
+    keystorePath: './secrets/keystore.jks', // path to your Android keystore file
+    appleCertificatePath: './secrets/certificate20230812.p12', // path to your Apple Certificate
+    appleProvisioningProfilePath: {
+      staging: './secrets/profiles/appname-adhoc20230812.mobileprovision',
+      'pre-prod': './secrets/profiles/appname-adhoc20230812.mobileprovision',
+      prod: './secrets/profiles/appname-distribution20230812.mobileprovision'
+    },
+    autoIncrementBuildNumber: true,
+    buildAndroidAppBundle: 'prod', // always - prod - none / if you want App Center to build an App Bundle instead of an .apk
   },
   git: {
     repoURL: 'https://gitlab.com/[my_team]/[my_project]/',
@@ -67,6 +91,56 @@ module.exports = {
 }
 ```
 
-## Build flow
+## Available Script arguments
 
-We thought a strict but usefull flow to publish our release that will impact how you will be using this publishing script. Your `staging` branch should always be your stable branch. In that regard, when you will build for staging, your app will reflect all the work on it. Then you can build on pre-prod, **it will pull everything you have on your staging branch** and merge it on the `pre-prod` branch. Then you will build for prod, if `pre-prod` is stable enough. Because **building for prod means it will pull from `pre-prod` only** and merge it to `prod`. So **it will be impossible** using this publishing script **to build directly for prod from the staging branch**. Keep that in mind in your review and build flow.
+To avoid remembering them all we recommand you to create an entry in your `package.json` for each of them : 
+```json
+"scripts": {
+  ...
+  "appcenter:publish": "./node_modules/zol-msappcenter-publish/index.cjs",
+  "appcenter:update": "./node_modules/zol-msappcenter-publish/index.cjs --update-config",
+  "appcenter:add-var": "./node_modules/zol-msappcenter-publish/index.cjs --add-variable",
+  "appcenter:hotfix": "./node_modules/zol-msappcenter-publish/index.cjs --hotfix"
+},
+```
+
+### `--init-config`
+
+You will need to run the script with this argument only once in your project. As explained, it will trigger a script that will automatically set up your builds environment. In details it will : 
+- check if every branches exists on github and create them if necessary
+- create the distribution groups Staging and Pre-prod for your App Center applications
+- for each of your App Center applications and your git branches configure properly and link the builds to the right distribution group
+
+### `--update-config`
+
+Yet to come
+
+### `--add-variable`
+
+Yet to come
+
+### `--hotfix`
+
+Yet to come but if you encounter an hotfix to make here is the process to follow (and that the script will follow):
+
+Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.
+
+## Philosophy
+
+We thought a strict but usefull flow (to us) to manage our mobile application development flow that will for sure impact how you will be doing things too. The goal is to ease as much as possible the process of creating builds so that our projects managers and clients can QA tests really fast our iterations.  
+Then the process will be as follow : 
+
+```
+git:staging // Will be your main development branch where you merge all your new features and fixes
+↓
+appcenter:Staging // Your QA will have access to builds from the develop branch on the Staging group of AppCenter
+↓ (QA approved)
+git:pre-prod // Pull directly from your work on develop
+↓
+appcenter:Preprod // Your QA will have access to builds from the pre-prod branch on the Preprod group of AppCenter
+↓
+git:prod // Pull directly from your work on pre-prod, tag a new version, generate changelog in the repository
+↓
+appcenter:Stores // When configured, your builds will be published on Google Beta & Testflight to have a last check before going to production
+```
+Once you will be using the script you won't be able to skip a step because each step get its work from a specific branch and in this strict order. It enforce QA on each different environments possible and once you will be set for production you should be at peace with yourself.
