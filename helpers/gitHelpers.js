@@ -1,4 +1,5 @@
 const { execSync } = require('child_process');
+const { prompt } = require('enquirer');
 const fs = require('fs');
 const { printConsoleMessage, printErrorConsoleMessage, getConfigObject } = require('./commonHelpers');
 const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers');
@@ -185,12 +186,23 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv) => {
   return newVersionNumber;
 };
 
-const manageGitFlow = (targetedEnv, CONFIG) => {
+const manageGitFlow = async (targetedEnv, CONFIG) => {
   const isTargetForProd = targetedEnv === 'prod';
   const newVersionNumber = gitGenerateChangeLog(isTargetForProd, targetedEnv, CONFIG);
 
   if (isTargetForProd) {
-    gitTagBranch(newVersionNumber);
+    const { shouldTagVersion } = await prompt([
+      {
+        type: 'select',
+        name: 'shouldTagVersion',
+        message: 'Do you want to tag this version and bump release version number ?',
+        choices: ['Yes, bump release version number', 'No, just want a new build'],
+      },
+    ]);
+
+    if (shouldTagVersion.includes('Yes')) {
+      gitTagBranch(newVersionNumber);
+    }
   }
 
   printConsoleMessage(`Checkout on ${CONFIG.git.branches[targetedEnv]} branch`);

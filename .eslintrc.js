@@ -14,14 +14,12 @@ module.exports = {
     'max-len': ['error', {
       code: 120,
       comments: 120,
+      tabWidth: 2,
       ignoreComments: false,
-      ignoreTrailingComments: false,
       ignoreUrls: true,
       ignoreStrings: true,
       ignoreTemplateLiterals: true,
       ignoreRegExpLiterals: true,
-      ignoreHTMLAttributeValues: false,
-      ignoreHTMLTextContents: false,
     }],
   },
 };

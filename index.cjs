@@ -36,10 +36,11 @@ const triggerDeployScript = async () => {
     // Get inputs from user
     const { platform, branch } = await prompt(deployPromptQuestions);
     // Run all the git commands to manage the versionning
-    manageGitFlow(branch, CONFIG);
+    await manageGitFlow(branch, CONFIG);
     // Trigger AppCenter build via API call
     triggerAppCenterBuild(platform, branch, CONFIG);
-  } catch {
+  } catch (error) {
+    console.error(error);
     process.exit(1);
   }
 };
