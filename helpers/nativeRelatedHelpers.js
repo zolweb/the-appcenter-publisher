@@ -1,6 +1,7 @@
 const { execSync } = require('child_process');
+const fs = require('fs');
 const appRootPath = require('app-root-path');
-const { printConsoleMessage } = require('./commonHelpers.js');
+const { printConsoleMessage, printErrorConsoleMessage } = require('./commonHelpers.js');
 
 const IS_LINUX = process.platform === 'linux';
 
@@ -15,9 +16,20 @@ const updateiOSVersionNumber = () => {
   const projectName = execSync(`grep "target" ${appRootPath}/ios/Podfile -m 1`)
     .toString()
     .split("'")[1];
-  const command = `sed -i ${
-    IS_LINUX ? '' : "''"
-  } "${20}s/>.*</>${currentVersion}</" "${appRootPath}/ios/${projectName}/Info.plist"`;
+  const infoPlistPath = `${appRootPath}/ios/${projectName}/Info.plist`
+
+  const infoPlistLines = fs.readFileSync(infoPlistPath).toString().split("\n");
+  const cFBundleShortVersionStringLineIndex = infoPlistLines
+  .findIndex(line => line.includes('CFBundleShortVersionString'))
+  infoPlistLines.splice(cFBundleShortVersionStringLineIndex + 1, 1, `\t<string>${currentVersion}</string>`);
+  const newInfoPlist = infoPlistLines.join("\n");
+
+  fs.writeFileSync(infoPlistPath, newInfoPlist, function (err) {
+    if (err) return printErrorConsoleMessage('Could not update InfoPlist file to update iOS version number');
+  });
+  // const command = `sed -i ${
+  //   IS_LINUX ? '' : "''"
+  // } "${20}s/>.*</>${currentVersion}</" "${appRootPath}/ios/${projectName}/Info.plist"`;
 
   execSync(command);
 };

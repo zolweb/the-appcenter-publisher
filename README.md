@@ -29,7 +29,7 @@ module.exports = {
       android: 'android_app_name',
     },
     autoIncrementBuildNumber: true,
-    buildAndroidAppBundle: 'prod,
+    buildAndroidAppBundle: 'prod',
   },
   git: {
     repoURL: 'https://gitlab.com/[my_team]/[my_project]/'
