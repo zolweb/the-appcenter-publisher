@@ -167,7 +167,7 @@ const askForAndroidKeyStoreSecrets = async () => {
  * Promp user for the Apple certificate password
  * @return  {Promise<{certificatePassword:String}>}
  */
-const askForAppleCertificatePassord = async () => {
+const askForAppleCertificatePassword = async () => {
   const certificatePromptQuestions = [
     {
       type: 'password',
@@ -466,7 +466,7 @@ const updateAppCenterBranchConfig = async () => {
   }
 
   if (CONFIG?.appCenter?.appleCertificatePath) {
-    appleSecretInformation = await askForAppleCertificatePassord();
+    appleSecretInformation = await askForAppleCertificatePassword();
   }
 
   const environmentVariables = await manageEnvironmentVariables();
