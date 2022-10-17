@@ -1,11 +1,46 @@
 const { execSync } = require('child_process');
+const { prompt } = require('enquirer');
 const fs = require('fs');
-const { printConsoleMessage } = require('./commonHelpers.cjs');
-const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers.cjs');
-const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers.cjs');
+const { printConsoleMessage, printErrorConsoleMessage, getConfigObject } = require('./commonHelpers');
+const { autoIncrementVersionNumber } = require('./nativeRelatedHelpers');
+const { sortOutGitLogToArrays, formatTheChangeLog } = require('./changeLogHelpers');
 
 const MAX_CHANGELOG_LENGTH = 3000;
 const CHANGELOG_FILE_PATH = './CHANGELOG.md';
+
+/**
+ * Check if a given branch name exists on origin
+ * @param  {string} branchName
+ * @return {boolean}
+ */
+const checkIfGitBranchExists = (branchName) => {
+  printConsoleMessage(`Checking if branch ${branchName} exists`);
+  // If branch exists command should print a string from origin with branch name.
+  // Otherwise, return is empty
+  const gitBranchFromOrigin = execSync(`git ls-remote --heads origin ${branchName}`).toString('utf-8').trim();
+
+  if (!gitBranchFromOrigin) {
+    printConsoleMessage(`Branch ${branchName} does not exists`);
+    return false;
+  }
+
+  printConsoleMessage(`Branch ${branchName} already exists`);
+  return true;
+};
+/**
+ * Create branch with given name on remote repository
+ * @param  {string} branchName
+ */
+const createGitBranch = (branchName) => {
+  printConsoleMessage(`Create branch ${branchName} on origin`);
+  try {
+    execSync(`git checkout -b ${branchName}`);
+    execSync(`git push -u origin ${branchName}`);
+  } catch {
+    printErrorConsoleMessage('Can\'t create git branch, please check your Git configuration or update your config file.');
+    process.exit(1);
+  }
+};
 
 /**
  * Fetch the last git tag and return it, if no tag return the starting version number from CONFIG
@@ -25,10 +60,11 @@ const getLatestTagVersionNumber = (startingVersionNumber) => {
  * @param  {String} gitMessage
  * @param  {String} commitSplitMarker
  * @param  {String} newVersionNumber
- * @param  {Object} CONFIG
  * @return {String}
  */
-const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber, CONFIG) => {
+const formatGitMessage = (gitMessage, commitSplitMarker, newVersionNumber) => {
+  const CONFIG = getConfigObject();
+
   if (gitMessage.length > MAX_CHANGELOG_LENGTH) {
     printConsoleMessage(
       'Git message too long, getting changes since last publish.',
@@ -82,8 +118,8 @@ const gitCreateCommitMessage = (
   commitSplitMarker,
   newVersionNumber,
   targetedEnv,
-  CONFIG,
 ) => {
+  const CONFIG = getConfigObject();
   const commitMessageBase = `Publish new ${targetedEnv} version`;
   const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(commitMessageBase);
 
@@ -103,7 +139,8 @@ const gitCreateCommitMessage = (
   }
 };
 
-const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
+const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv) => {
+  const CONFIG = getConfigObject();
   execSync(`git checkout ${CONFIG.git.branches.staging} && git pull`);
 
   const latestTag = getLatestTagVersionNumber(CONFIG.startingVersionNumber);
@@ -144,18 +181,28 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     commitSplitMarker,
     newVersionNumber,
     targetedEnv,
-    CONFIG,
   );
 
   return newVersionNumber;
 };
 
-const manageGitFlow = (targetedEnv, CONFIG) => {
+const manageGitFlow = async (targetedEnv, CONFIG) => {
   const isTargetForProd = targetedEnv === 'prod';
   const newVersionNumber = gitGenerateChangeLog(isTargetForProd, targetedEnv, CONFIG);
 
   if (isTargetForProd) {
-    gitTagBranch(newVersionNumber);
+    const { shouldTagVersion } = await prompt([
+      {
+        type: 'select',
+        name: 'shouldTagVersion',
+        message: 'Do you want to tag this version and bump release version number ?',
+        choices: ['Yes, bump release version number', 'No, just want a new build'],
+      },
+    ]);
+
+    if (shouldTagVersion.includes('Yes')) {
+      gitTagBranch(newVersionNumber);
+    }
   }
 
   printConsoleMessage(`Checkout on ${CONFIG.git.branches[targetedEnv]} branch`);
@@ -180,6 +227,19 @@ const manageGitFlow = (targetedEnv, CONFIG) => {
   execSync(`git checkout ${CONFIG.git.branches.staging}`);
 };
 
+const manageGitBranches = () => {
+  const { git: { branches } } = getConfigObject();
+
+  Object.keys(branches).forEach((branch) => {
+    if (!checkIfGitBranchExists(branches[branch])) {
+      createGitBranch(branches[branch]);
+    }
+  });
+  // Checkout back on staging branch
+  execSync(`git checkout ${branches.staging}`);
+};
+
 module.exports = {
   manageGitFlow,
+  manageGitBranches,
 };
