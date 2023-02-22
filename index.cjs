@@ -40,10 +40,10 @@ const triggerDeployScript = async ({isCi, platformParam, branchParam}) => {
   let branch = branchParam;
   try {
     if(!isCi) {
-    // Get inputs from user
-    const userResponse = await prompt(deployPromptQuestions);
-    platform = userResponse.platform;
-    branch = userResponse.branch;
+      // Get inputs from user
+      const userResponse = await prompt(deployPromptQuestions);
+      platform = userResponse.platform;
+      branch = userResponse.branch;
     }
     // Run all the git commands to manage the versionning
     await manageGitFlow(branch, CONFIG);
