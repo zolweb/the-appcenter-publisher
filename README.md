@@ -126,8 +126,10 @@ Yet to come but if you encounter a hotfix to make, here is the process to follow
 Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.
 
 ### `---ci [options]`
-
-Yet to come. Will add targets and environment in options to run script in CI.
+To run script without prompts.  
+You need to specify in options :   
+- `platform:[value]` where value must be one of `ios` or `android`. Leave empty for both platforms.
+- `env:[value]` where value must be one of `staging`, `pre-prod`, `prod`. Default value is staging.
 
 ## Philosophy
 
