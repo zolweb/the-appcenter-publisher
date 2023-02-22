@@ -531,4 +531,5 @@ module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
   updateAppCenterBranchConfig,
+  manageEnvironmentVariables,
 };
