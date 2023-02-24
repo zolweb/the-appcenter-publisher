@@ -6,7 +6,7 @@ const { prompt } = require('enquirer');
 const { validateProjectConfig, getConfigObject, printErrorConsoleMessage} = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
 const { triggerAppCenterBuild, createAppCenterDistributionGroups, updateAppCenterBranchConfig,
-  manageEnvironmentVariables
+  manageEnvironmentVariables, retrieveEnvConfig, handleUpdateConfig
 } = require('./helpers/appCenterHelpers');
 const {getAppCenterBranchConfig, postAppCenterBranchConfig, putAppCenterBranchConfig} = require("./services/appCenterService");
 const ora = require("ora");
@@ -71,99 +71,64 @@ const triggerInitConfigScript = async () => {
 
 const triggerUpdateConfigScript = () => { };
 
+const askForNewVariableValue = async (varList, currentVar, env) => {
+  const askForValue = await prompt({
+    type: 'input',
+    name: 'newValue',
+    initial: varList?.find(({name}) => name === currentVar)?.value,
+    message: `New ${env} value :`
+  })
+  if(varList?.map(({name}) => name)?.includes(currentVar)) {
+    return varList?.map(({name, value}) => {
+      if(name === currentVar) {
+        return {name, value: askForValue.newValue}
+      }
+      return {name, value}
+    })
+  }
+  return varList?.concat([{name: currentVar, value: askForValue.newValue}])
+
+}
+
 const triggerVariableConfigScript = async () => {
-  //TODO for new variable copy .env.js in post-clone script
+  //Copy .env.js in post-clone script and get project variables
   const allProjectVariables = await manageEnvironmentVariables();
-  const CONFIG = getConfigObject();
-  let stagingVariablesToAdd = [];
-  let preprodVariablesToAdd = [];
-  let prodVariablesToAdd = [];
-  // get staging env variable
-  const getDevelopBranchConfig = await getAppCenterBranchConfig(CONFIG.appCenter.appName.android, CONFIG.appCenter.userName, CONFIG.git.branches.staging)
-  const developVariables = getDevelopBranchConfig?.data?.environmentVariables?.reduce((acc, {name, value}) => {
-    return {...acc, [name]: value}
-  }, {});
-  // get preprod env variable
-  const getPreprodBranchConfig = await getAppCenterBranchConfig(CONFIG.appCenter.appName.android, CONFIG.appCenter.userName, CONFIG.git.branches["pre-prod"])
-  const prepropVariables = getPreprodBranchConfig?.data?.environmentVariables?.reduce((acc, {name, value}) => {
-    return {...acc, [name]: value}
-  }, {});
-  // get prod env variable
-  const getProdBranchConfig = await getAppCenterBranchConfig(CONFIG.appCenter.appName.android, CONFIG.appCenter.userName, CONFIG.git.branches.prod)
-  const prodVariables = getProdBranchConfig?.data?.environmentVariables?.reduce((acc, {name, value}) => {
-    return {...acc, [name]: value}
-  }, {});
-  //for each values in env.js
+
+  // get appCenter config
+  const stagingConfig = await retrieveEnvConfig('staging') || [];
+  const preprodConfig = await retrieveEnvConfig('pre-prod') || [];
+  const prodConfig = await retrieveEnvConfig('prod') || [];
+
+  // variables and their values in appCenter config
+  let stagingVariables = stagingConfig?.environmentVariables || [];
+  let preprodVariables = preprodConfig?.environmentVariables || [];
+  let prodVariables = prodConfig?.environmentVariables || [];
+
+  //for each variables in env.js
   for (const variable of allProjectVariables) {
-    //   //ask user if he wants to update variable value in appCenter
+    //ask user if he/she wants to update variable value in appCenter
     const updateVariables = await prompt({
       type: 'confirm',
       name: 'doUpdate',
       message: `Do you want to update "${variable}" values?`
     })
     if (updateVariables.doUpdate) {
-      // For each values, display value for staging env and ask if user wants the new value
-      const newStagingValue = await prompt({
-        type: 'input',
-        name: 'newValue',
-        initial: developVariables?.[variable],
-        message: `New staging value :`
-      })
-      console.log("newValue", newStagingValue)
-      stagingVariablesToAdd = stagingVariablesToAdd?.concat([{name: variable, value: newStagingValue.newValue}])
-      // For each values, display value for preprod env and ask if user wants the new value
-      const newPreprodValue = await prompt({
-        type: 'input',
-        name: 'newValue',
-        initial: prepropVariables?.[variable],
-        message: `New preprod value :`
-      })
-      console.log("newValue", newPreprodValue)
-      preprodVariablesToAdd = preprodVariablesToAdd?.concat([{name: variable, value: newPreprodValue.newValue}])
-      // For each values, display value for prod env and ask if user wants the new value
-      const newProdValue = await prompt({
-        type: 'input',
-        name: 'newValue',
-        initial: prodVariables?.[variable],
-        message: `New prod value :`
-      })
-      console.log("newValue", newProdValue)
-      prodVariablesToAdd = prodVariablesToAdd?.concat([{name: variable, value: newProdValue.newValue}])
-    }
-    else {
-      //TODO add variable and its value in toAdd Lists
+      // ask for the new value
+      stagingVariables = await askForNewVariableValue(stagingVariables, variable, 'staging');
+      preprodVariables = await askForNewVariableValue(preprodVariables, variable, 'pre-prod');
+      prodVariables = await askForNewVariableValue(prodVariables, variable, 'prod');
     }
   }
-  // if some values has changed, send them to appCenter
-  const branchConfigLoader = ora().start(`\x1b[1mUpdate environement variables\x1b[0m\n`);
-  try {
-    // Send API Call
-    console.log("appName", CONFIG.appCenter.appName.ios)
-    console.log("userName", CONFIG.appCenter.userName)
-    console.log("branch", CONFIG.git.branches.staging)
-    console.log("config", {
-      ...getDevelopBranchConfig?.data,
-      environmentVariables: stagingVariablesToAdd,
-    })
-    const iosStagingConfigQueryRes = await putAppCenterBranchConfig(
-        CONFIG.appCenter.appName.ios,
-        CONFIG.appCenter.userName,
-        CONFIG.git.branches.staging,
-        {
-          trigger: getDevelopBranchConfig?.data?.trigger,
-          testsEnabled: getDevelopBranchConfig?.data?.testsEnabled,
-          badgeIsEnabled: getDevelopBranchConfig?.data?.badgeIsEnabled,
-          toolsets: getDevelopBranchConfig?.data?.toolsets,
-          environmentVariables: stagingVariablesToAdd,
-        });
-    if ([200, 201].includes(iosStagingConfigQueryRes.status)) {
-      branchConfigLoader.succeed(`\x1b[1m Staging ios env variables updated with success !\x1b[0m`);
-    }
-  } catch (error) {
-    branchConfigLoader.fail(`Could not update variables\n`);
-    // eslint-disable-next-line no-console
-    console.error('ERR ', error?.response?.status, error?.response?.data);
-  }
+  // Send new values to appCenter for ios and android app and for each environment
+  const newStagingConfig = {...stagingConfig, environmentVariables: stagingVariables};
+  await handleUpdateConfig('staging','ios', newStagingConfig);
+  await handleUpdateConfig('staging','android', newStagingConfig);
+  const newPreprodConfig = {...preprodConfig, environmentVariables: preprodVariables};
+  await handleUpdateConfig('pre-prod', 'ios', newPreprodConfig);
+  await handleUpdateConfig('pre-prod', 'android', newPreprodConfig);
+  const newProdConfig = {...prodConfig, environmentVariables: prodVariables};
+  await handleUpdateConfig('prod', 'ios', newProdConfig);
+  await handleUpdateConfig('prod', 'android', newProdConfig)
 }
 
 const validateCIParams = ({platform, env}) => {

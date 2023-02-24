@@ -15,7 +15,7 @@ const {
   postAppCenterBranchConfig,
   postAppCenterFileAsset,
   getAppCenterDistributionGroups,
-  getAppCenterAppToolsets,
+  getAppCenterAppToolsets, getAppCenterBranchConfig, putAppCenterBranchConfig,
 } = require('../services/appCenterService');
 const { getConfigObject, printConsoleMessage } = require('./commonHelpers');
 
@@ -527,9 +527,74 @@ const updateAppCenterBranchConfig = async () => {
   }
 };
 
+/**
+ * Get appCenter config for a specific env
+ * @param env 'staging' or 'pre-prod' or 'prod'
+ * @returns {Promise<void>}
+ */
+const retrieveEnvConfig = async (env) => {
+  const branchConfigLoader = ora().start(`\x1b[1mGet ${env} AppCenter config\x1b[0m\n`);
+  try {
+    const getBranchConfig = await getAppCenterBranchConfig(
+      CONFIG.appCenter.appName.android,
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+    );
+
+    if ([200, 201].includes(getBranchConfig.status)) {
+      branchConfigLoader.succeed(`\x1b[1m Get ${env} AppCenter config with success !\x1b[0m`);
+      return getBranchConfig?.data;
+    }
+  } catch (error) {
+    branchConfigLoader.fail('Could not get config\n');
+    // eslint-disable-next-line no-console
+    console.error('ERR ', error?.response?.status, error?.response?.data);
+  }
+  return null;
+};
+
+/**
+ * Update appCenter config for a specific env
+ * @param {string} env 'staging' or 'pre-prod' or 'prod'
+ * @param {string} platform 'ios' or 'android'
+ * @param {object} newConfig
+ * @returns {Promise<void>}
+ */
+const handleUpdateConfig = async (env, platform, newConfig) => {
+  const branchConfigLoader = ora().start(`\x1b[1mUpdate appCenter ${env} config on ${platform}\x1b[0m\n`);
+  try {
+    // Send API Call
+    const configQueryRes = await putAppCenterBranchConfig(
+      CONFIG.appCenter.appName?.[platform],
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+      {
+        trigger: newConfig?.trigger,
+        testsEnabled: newConfig?.testsEnabled,
+        badgeIsEnabled: newConfig?.badgeIsEnabled,
+        toolsets: newConfig?.toolsets,
+        environmentVariables: newConfig?.environmentVariables,
+      },
+    );
+    if ([200, 201].includes(configQueryRes.status)) {
+      branchConfigLoader.succeed(`\x1b[1m App center ${platform} ${env} config updated with success !\x1b[0m`);
+    }
+  } catch (error) {
+    if (error.response.status === 404) {
+      branchConfigLoader.succeed(`Config of ${platform} for ${env} doesn't exist, please create branch configuration, skipping\n`);
+    } else {
+      branchConfigLoader.fail(`Could not update config on ${platform} ${env}\n`);
+      // eslint-disable-next-line no-console
+      console.error('ERR ', error?.response?.status, error?.response?.data);
+    }
+  }
+};
+
 module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
   updateAppCenterBranchConfig,
   manageEnvironmentVariables,
+  retrieveEnvConfig,
+  handleUpdateConfig,
 };
