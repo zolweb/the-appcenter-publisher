@@ -54,7 +54,7 @@ Then before started creating builds like crazy, one last step is to run in your 
 
 ## Publishrc configuration options
 
-You can go with the basic configuration or further customize your building process. Read along for an exemple of a full `.publishrc` file :
+You can go with the basic configuration or further customize your building process. Read along for an example of a full `.publishrc` file :
 
 ```javascript
 module.exports = {
@@ -107,7 +107,7 @@ To avoid remembering them all we recommand you to create an entry in your `packa
 ### `--init-config`
 
 You will need to run the script with this argument only once in your project. As explained, it will trigger a script that will automatically set up your builds environment. In details it will : 
-- check if every branches exists on github and create them if necessary
+- check if every branch exists on repo and create them if necessary
 - create the distribution groups Staging and Pre-prod for your App Center applications
 - for each of your App Center applications and your git branches configure properly and link the builds to the right distribution group
 
@@ -121,14 +121,20 @@ Yet to come
 
 ### `--hotfix`
 
-Yet to come but if you encounter an hotfix to make here is the process to follow (and that the script will follow):
+Yet to come but if you encounter a hotfix to make, here is the process to follow (and that the script will follow):
 
 Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.
 
+### `---ci [options]`
+To run script without prompts.  
+You need to specify in options :   
+- `platform:[value]` where value must be one of `ios` or `android`. Leave empty for both platforms.
+- `env:[value]` where value must be one of `staging`, `pre-prod`, `prod`. Default value is staging.
+
 ## Philosophy
 
-We thought a strict but usefull flow (to us) to manage our mobile application development flow that will for sure impact how you will be doing things too. The goal is to ease as much as possible the process of creating builds so that our projects managers and clients can QA tests really fast our iterations.  
-Then the process will be as follow : 
+We thought a strict but useful flow (to us) to manage our mobile application development flow that will for sure impact how you will be doing things too. The goal is to ease as much as possible the process of creating builds so that our projects managers and clients can QA tests really fast our iterations.  
+Then the process will be as follows : 
 
 ```
 git:staging // Will be your main development branch where you merge all your new features and fixes
