@@ -117,7 +117,35 @@ Yet to come
 
 ### `--add-variable`
 
-Yet to come
+Run this script when you need to add an environment variable to your projet. You first need to write the variable in `env.js` and export it then the script will :
+- Copy all the variables needed in the postclone script (the one that is responsible for copying the values from appCenter config to your env file)
+- Update values for each environment variable, on each environment and both platforms
+
+Exemple of `env.js` file format : 
+```js
+const BUILD_ENV = 'staging';
+const API_URL = 'https://reqres.in/api';
+
+export default {
+  BUILD_ENV,
+  API_URL,
+};
+```
+...and its associated `appcenter-post-clone.sh` :
+```shell
+#!/usr/bin/env bash
+
+echo "==============================================="
+echo "SETTING env.js FILE"
+echo "==============================================="
+cat > ./env.js <<EOL
+export const BUILD_ENV = "${BUILD_ENV}";
+export const API_URL = "${API_URL}";
+
+EOL
+cat ./env.js
+    
+```
 
 ### `--hotfix`
 
