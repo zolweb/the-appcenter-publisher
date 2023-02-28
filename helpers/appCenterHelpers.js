@@ -453,7 +453,7 @@ const createAppCenterDistributionGroups = async () => {
   }
 };
 
-const updateAppCenterBranchConfig = async () => {
+const createAppCenterBranchConfig = async () => {
   let keystoreSecretInformation = {};
   let appleSecretInformation = {};
 
@@ -529,20 +529,21 @@ const updateAppCenterBranchConfig = async () => {
 
 /**
  * Get appCenter config for a specific env
- * @param env 'staging' or 'pre-prod' or 'prod'
+ * @param {string} env 'staging' or 'pre-prod' or 'prod'
+ * @param {string} platform 'ios or 'android
  * @returns {Promise<void>}
  */
-const retrieveEnvConfig = async (env) => {
-  const branchConfigLoader = ora().start(`\x1b[1mGet ${env} AppCenter config\x1b[0m\n`);
+const retrieveEnvConfig = async (env, platform) => {
+  const branchConfigLoader = ora().start(`\x1b[1mGet ${platform} ${env} AppCenter config\x1b[0m\n`);
   try {
     const getBranchConfig = await getAppCenterBranchConfig(
-      CONFIG.appCenter.appName.android,
+      CONFIG.appCenter.appName?.[platform],
       CONFIG.appCenter.userName,
       CONFIG.git.branches?.[env],
     );
 
     if ([200, 201].includes(getBranchConfig.status)) {
-      branchConfigLoader.succeed(`\x1b[1m Get ${env} AppCenter config with success !\x1b[0m`);
+      branchConfigLoader.succeed(`\x1b[1m Get ${platform} ${env} AppCenter config with success !\x1b[0m`);
       return getBranchConfig?.data;
     }
   } catch (error) {
@@ -593,7 +594,7 @@ const handleUpdateConfig = async (env, platform, newConfig) => {
 module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
-  updateAppCenterBranchConfig,
+  createAppCenterBranchConfig,
   manageEnvironmentVariables,
   retrieveEnvConfig,
   handleUpdateConfig,

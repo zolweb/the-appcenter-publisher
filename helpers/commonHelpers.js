@@ -80,9 +80,20 @@ const getConfigObject = () => ({
   },
 });
 
+const union = (arrayA, arrayB) => {
+  const merge = arrayA?.concat(arrayB);
+  return merge?.reduce((acc, item) => {
+    if (acc?.includes(item)) {
+      return acc;
+    }
+    return acc?.concat([item]);
+  }, []);
+};
+
 module.exports = {
   printConsoleMessage,
   printErrorConsoleMessage,
   validateProjectConfig,
   getConfigObject,
+  union,
 };

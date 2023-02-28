@@ -3,9 +3,9 @@
 /* eslint-disable no-console */
 // Imports
 const { prompt } = require('enquirer');
-const { validateProjectConfig, getConfigObject, printErrorConsoleMessage} = require('./helpers/commonHelpers');
+const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, union} = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
-const { triggerAppCenterBuild, createAppCenterDistributionGroups, updateAppCenterBranchConfig,
+const { triggerAppCenterBuild, createAppCenterDistributionGroups, createAppCenterBranchConfig,
   manageEnvironmentVariables, retrieveEnvConfig, handleUpdateConfig
 } = require('./helpers/appCenterHelpers');
 const {getAppCenterBranchConfig, postAppCenterBranchConfig, putAppCenterBranchConfig} = require("./services/appCenterService");
@@ -66,10 +66,16 @@ const triggerInitConfigScript = async () => {
   // Use Appcenter API to create groups
   await createAppCenterDistributionGroups();
   // Use AppCenter API to create the config for each git branch
-  await updateAppCenterBranchConfig();
+  await createAppCenterBranchConfig();
 };
 
-const triggerUpdateConfigScript = () => { };
+const triggerUpdateConfigScript = async () => {
+  // Check if all branches exists on repo otherwise create them
+  manageGitBranches();
+  // Create groups (skip if already exists)
+  await createAppCenterDistributionGroups();
+  // TODO call handleUpdateConfig for each env and each platform
+};
 
 const askForNewVariableValue = async (varList, currentVar, env) => {
   const askForValue = await prompt({
@@ -95,9 +101,15 @@ const triggerVariableConfigScript = async () => {
   const allProjectVariables = await manageEnvironmentVariables();
 
   // get appCenter config
-  const stagingConfig = await retrieveEnvConfig('staging') || [];
-  const preprodConfig = await retrieveEnvConfig('pre-prod') || [];
-  const prodConfig = await retrieveEnvConfig('prod') || [];
+  const stagingAndroidConfig = await retrieveEnvConfig('staging', 'android') || [];
+  const stagingIosConfig = await retrieveEnvConfig('staging', 'ios') || [];
+  const stagingConfig = union(stagingAndroidConfig, stagingIosConfig);
+  const preprodAndroidConfig = await retrieveEnvConfig('pre-prod', 'android') || [];
+  const preprodIosConfig = await retrieveEnvConfig('pre-prod', 'ios') || [];
+  const preprodConfig = union(preprodAndroidConfig, preprodIosConfig)
+  const prodAndroidConfig = await retrieveEnvConfig('prod', 'android') || [];
+  const prodIosConfig = await retrieveEnvConfig('prod', 'ios') || [];
+  const prodConfig = union(prodAndroidConfig, prodIosConfig);
 
   // variables and their values in appCenter config
   let stagingVariables = stagingConfig?.environmentVariables || [];
