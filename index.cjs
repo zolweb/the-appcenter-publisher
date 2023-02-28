@@ -70,11 +70,12 @@ const triggerInitConfigScript = async () => {
 };
 
 const triggerUpdateConfigScript = async () => {
-  // Check if all branches exists on repo otherwise create them
-  manageGitBranches();
-  // Create groups (skip if already exists)
-  await createAppCenterDistributionGroups();
-  // TODO call handleUpdateConfig for each env and each platform
+  // // Check if all branches exists on repo otherwise create them
+  // manageGitBranches();
+  // // Create groups (skip if already exists)
+  // await createAppCenterDistributionGroups();
+  // // Use AppCenter API to create or update the config for each git branch
+  // await createAppCenterBranchConfig()
 };
 
 const askForNewVariableValue = async (varList, currentVar, env) => {
