@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-
 /* eslint-disable no-console */
+
 // Imports
 const { prompt } = require('enquirer');
 const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, union} = require('./helpers/commonHelpers');
@@ -70,11 +70,10 @@ const triggerInitConfigScript = async () => {
 };
 
 const triggerUpdateConfigScript = async () => {
-  // Check if all branches exists on repo otherwise create them
-  manageGitBranches();
-  // Create groups (skip if already exists)
-  await createAppCenterDistributionGroups();
-  // TODO call handleUpdateConfig for each env and each platform
+  // // Check if all branches exists on repo otherwise create them
+  // manageGitBranches();
+  // // Create groups (skip if already exists)
+  // await createAppCenterDistributionGroups();
 };
 
 const askForNewVariableValue = async (varList, currentVar, env) => {
@@ -118,7 +117,7 @@ const triggerVariableConfigScript = async () => {
 
   //for each variables in env.js
   for (const variable of allProjectVariables) {
-    //ask user if he/she wants to update variable value in appCenter
+    //ask user if they want to update variable value in appCenter
     const updateVariables = await prompt({
       type: 'confirm',
       name: 'doUpdate',

@@ -117,7 +117,7 @@ Yet to come
 
 ### `--add-variable`
 
-Run this script when you need to add an environment variable to your projet. You first need to write the variable in `env.js` and export it then the script will :
+Run this script when you need to add an environment variable to your project. You first need to write the variable in `env.js` and export it then the script will :
 - Copy all the variables needed in the postclone script (the one that is responsible for copying the values from appCenter config to your env file)
 - Update values for each environment variable, on each environment and both platforms
 

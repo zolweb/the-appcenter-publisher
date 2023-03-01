@@ -1,5 +1,7 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
+/* eslint-disable no-console */
+
 const fs = require('fs');
 const readline = require('readline');
 const ora = require('ora');
@@ -90,7 +92,6 @@ const triggerAppCenterBuild = async (platformList, branch) => {
       ));
     } else {
       triggerBuildLoader.fail(`The ${platform} build was not triggered.\n`);
-      // eslint-disable-next-line no-console
       console.error('ERR ', triggerBuildQueryRes.status);
     }
   }
@@ -211,7 +212,6 @@ const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
     };
   } catch (error) {
     uploadCertificateLoader.fail('Could not create upload Apple Certificate and Provisioning Profile\n');
-    // eslint-disable-next-line no-console
     console.error('ERR ', error.response.status, error.response.data);
     return {};
   }
@@ -256,7 +256,6 @@ cat ./env.js
     const fileContent = postCloneContent.replace(/\[variables\]/, variablesToInsert.join(''));
     fs.writeFileSync('appcenter-post-clone.sh', fileContent);
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error(error);
     printConsoleMessage('No Environment variables detected');
   }
@@ -298,7 +297,6 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
     }
   } catch (error) {
     branchToolsetsLoader.fail(`Could not retrieve ${toolsetsLoaderString}\n`);
-    // eslint-disable-next-line no-console
     console.error('ERR ', error.response.status, error.response.data);
   }
 
@@ -406,7 +404,6 @@ const sendAppcenterBranchConfig = async (
       branchConfigLoader.fail(`A ${envLoaderString} already exists, please update instead.\n`);
     } else {
       branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
-      // eslint-disable-next-line no-console
       console.error('ERR ', error.response.status, error.response.data);
     }
   }
@@ -445,7 +442,6 @@ const createAppCenterDistributionGroups = async () => {
           distributionGroupLoader.succeed(`\x1b[1m${distributionGroupConsoleString} already exists, skipping\x1b[0m`);
         } else {
           distributionGroupLoader.fail(`Could not create ${distributionGroupConsoleString}\n`);
-          // eslint-disable-next-line no-console
           console.error('ERR ', error.response.status);
         }
       }
@@ -453,6 +449,10 @@ const createAppCenterDistributionGroups = async () => {
   }
 };
 
+/**
+ * Create config for every branch and both platform
+ * @returns {Promise<void>}
+ */
 const createAppCenterBranchConfig = async () => {
   let keystoreSecretInformation = {};
   let appleSecretInformation = {};
@@ -529,8 +529,8 @@ const createAppCenterBranchConfig = async () => {
 
 /**
  * Get appCenter config for a specific env
- * @param {string} env 'staging' or 'pre-prod' or 'prod'
- * @param {string} platform 'ios or 'android
+ * @param {'staging'|'pre-prod'|'prod'} env
+ * @param {'ios'|'android'} platform
  * @returns {Promise<void>}
  */
 const retrieveEnvConfig = async (env, platform) => {
@@ -548,7 +548,6 @@ const retrieveEnvConfig = async (env, platform) => {
     }
   } catch (error) {
     branchConfigLoader.fail('Could not get config\n');
-    // eslint-disable-next-line no-console
     console.error('ERR ', error?.response?.status, error?.response?.data);
   }
   return null;
@@ -556,9 +555,8 @@ const retrieveEnvConfig = async (env, platform) => {
 
 /**
  * Update appCenter config for a specific env
- * @param {string} env 'staging' or 'pre-prod' or 'prod'
- * @param {string} platform 'ios' or 'android'
- * @param {object} newConfig
+ * @param {'staging'|'pre-prod'|'prod'} env
+ * @param {'ios'|'android'} platform * @param {object} newConfig
  * @returns {Promise<void>}
  */
 const handleUpdateConfig = async (env, platform, newConfig) => {
@@ -585,7 +583,6 @@ const handleUpdateConfig = async (env, platform, newConfig) => {
       branchConfigLoader.succeed(`Config of ${platform} for ${env} doesn't exist, please create branch configuration, skipping\n`);
     } else {
       branchConfigLoader.fail(`Could not update config on ${platform} ${env}\n`);
-      // eslint-disable-next-line no-console
       console.error('ERR ', error?.response?.status, error?.response?.data);
     }
   }
