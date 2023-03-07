@@ -50,7 +50,7 @@ const triggerDeployScript = async ({isCi, platformParam, branchParam}) => {
       platform = userResponse.platform;
       branch = userResponse.branch;
     }
-    // Run all the git commands to manage the versionning
+    // Run all the git commands to manage the versioning
     await manageGitFlow(branch, CONFIG);
     // Trigger AppCenter build via API call
     triggerAppCenterBuild(platform, branch);
@@ -67,15 +67,6 @@ const triggerInitConfigScript = async () => {
   await createAppCenterDistributionGroups();
   // Use AppCenter API to create the config for each git branch
   await createAppCenterBranchConfig();
-};
-
-const triggerUpdateConfigScript = async () => {
-  // // Check if all branches exists on repo otherwise create them
-  // manageGitBranches();
-  // // Create groups (skip if already exists)
-  // await createAppCenterDistributionGroups();
-  // // Use AppCenter API to create or update the config for each git branch
-  // await createAppCenterBranchConfig()
 };
 
 const askForNewVariableValue = async (varList, currentVar, env) => {
@@ -164,12 +155,8 @@ async function startScript() {
   const isCI = args.includes(SCRIPT_PARAMS.CI_MODE);
   const isVariableConfig = args.includes(SCRIPT_PARAMS.VAR_CONFIG);
 
-  if (isInitConfig) {
+  if (isInitConfig || isUpdateConfig) {
     return triggerInitConfigScript();
-  }
-
-  if (isUpdateConfig) {
-    return triggerUpdateConfigScript();
   }
 
   if( isVariableConfig) {

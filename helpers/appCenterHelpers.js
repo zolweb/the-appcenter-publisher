@@ -440,7 +440,7 @@ const sendAppcenterBranchConfig = async (
     }
   } catch (error) {
     if (error.response.status === 409) {
-      branchConfigLoader.fail(`A ${envLoaderString} already exists, please update instead.\n`);
+      branchConfigLoader.warn(`A ${envLoaderString} already exists, update instead.\n`);
       await handleUpdateConfig(branchEnvironment, applicationPlatform, appCenterConfigToSend);
     } else {
       branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
