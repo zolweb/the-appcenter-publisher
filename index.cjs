@@ -102,18 +102,15 @@ const triggerVariableConfigScript = async () => {
   // get appCenter config
   const stagingAndroidConfig = await retrieveEnvConfig('staging', 'android') || [];
   const stagingIosConfig = await retrieveEnvConfig('staging', 'ios') || [];
-  const stagingConfig = union(stagingAndroidConfig, stagingIosConfig);
   const preprodAndroidConfig = await retrieveEnvConfig('pre-prod', 'android') || [];
   const preprodIosConfig = await retrieveEnvConfig('pre-prod', 'ios') || [];
-  const preprodConfig = union(preprodAndroidConfig, preprodIosConfig)
   const prodAndroidConfig = await retrieveEnvConfig('prod', 'android') || [];
   const prodIosConfig = await retrieveEnvConfig('prod', 'ios') || [];
-  const prodConfig = union(prodAndroidConfig, prodIosConfig);
 
   // variables and their values in appCenter config
-  let stagingVariables = stagingConfig?.environmentVariables || [];
-  let preprodVariables = preprodConfig?.environmentVariables || [];
-  let prodVariables = prodConfig?.environmentVariables || [];
+  let stagingVariables = union(stagingAndroidConfig?.environmentVariables || [], stagingIosConfig?.environmentVariables || []);
+  let preprodVariables = union(preprodAndroidConfig?.environmentVariables || [], preprodIosConfig?.environmentVariables || []);
+  let prodVariables = union(prodAndroidConfig?.environmentVariables || [], prodIosConfig?.environmentVariables || []);
 
   //for each variables in env.js
   for (const variable of allProjectVariables) {
@@ -131,15 +128,18 @@ const triggerVariableConfigScript = async () => {
     }
   }
   // Send new values to appCenter for ios and android app and for each environment
-  const newStagingConfig = {...stagingConfig, environmentVariables: stagingVariables};
-  await handleUpdateConfig('staging','ios', newStagingConfig);
-  await handleUpdateConfig('staging','android', newStagingConfig);
-  const newPreprodConfig = {...preprodConfig, environmentVariables: preprodVariables};
-  await handleUpdateConfig('pre-prod', 'ios', newPreprodConfig);
-  await handleUpdateConfig('pre-prod', 'android', newPreprodConfig);
-  const newProdConfig = {...prodConfig, environmentVariables: prodVariables};
-  await handleUpdateConfig('prod', 'ios', newProdConfig);
-  await handleUpdateConfig('prod', 'android', newProdConfig)
+  const newStagingAndroidConfig = {...stagingAndroidConfig, environmentVariables: stagingVariables};
+  const newStagingIosConfig = {...stagingAndroidConfig, environmentVariables: stagingVariables};
+  await handleUpdateConfig('staging','ios', newStagingIosConfig);
+  await handleUpdateConfig('staging','android', newStagingAndroidConfig);
+  const newPreprodAndroidConfig = {...preprodAndroidConfig, environmentVariables: preprodVariables};
+  const newPreprodIosConfig = {...preprodIosConfig, environmentVariables: preprodVariables};
+  await handleUpdateConfig('pre-prod', 'ios', newPreprodIosConfig);
+  await handleUpdateConfig('pre-prod', 'android', newPreprodAndroidConfig);
+  const newProdAndroidConfig = {...prodAndroidConfig, environmentVariables: prodVariables};
+  const newProdIosConfig = {...prodIosConfig, environmentVariables: prodVariables};
+  await handleUpdateConfig('prod', 'ios', newProdIosConfig);
+  await handleUpdateConfig('prod', 'android', newProdAndroidConfig)
 }
 
 const validateCIParams = ({platform, env}) => {

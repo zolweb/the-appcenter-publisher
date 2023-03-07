@@ -80,6 +80,12 @@ const getConfigObject = () => ({
   },
 });
 
+/**
+ * Merge two array items
+ * @param arrayA
+ * @param arrayB
+ * @returns {*|*[]}
+ */
 const union = (arrayA, arrayB) => {
   const merge = arrayA?.concat(arrayB);
   return merge?.reduce((acc, item) => {
@@ -87,7 +93,7 @@ const union = (arrayA, arrayB) => {
       return acc;
     }
     return acc?.concat([item]);
-  }, []);
+  }, []) || [];
 };
 
 module.exports = {
