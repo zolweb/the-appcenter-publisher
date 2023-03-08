@@ -143,7 +143,7 @@ const triggerVariableConfigScript = async () => {
 }
 
 const validateCIParams = ({platform, env}) => {
-  if(platform && !PLATFORMS?.includes(platform)) {
+  if( !PLATFORMS?.includes(platform) && !Array.isArray(platform)) {
     printErrorConsoleMessage(`platform param is incorrect, possible values are : ${PLATFORMS?.join(' or ')}. Leave empty for both`);
     process.exit(1);
   }
@@ -175,15 +175,21 @@ async function startScript() {
   }
 
   if (isCI) {
-    const defaultPlatform = ['android', 'ios'];
     const defaultEnv = 'staging';
-    const platform = args.find((item) => item?.includes('platform'))?.split(':')?.pop();
-    const env = args.find((item) => item?.includes('env'))?.split(':')?.pop();
-    validateCIParams({platform, env});
+    const formattedArgs = args.reduce((acc, item) => {
+      if(item?.includes('platform')) {
+        return Object.assign(acc, {platform: item?.split(':')?.pop()});
+      }
+      if(item?.includes('env')) {
+        return Object.assign(acc, {env: item?.split(':')?.pop()});
+      }
+      return acc;
+    }, {platform: PLATFORMS, env: defaultEnv});
+    validateCIParams(formattedArgs);
     return triggerDeployScript({
       isCi: true,
-      platformParam: platform ? [platform] : defaultPlatform,
-      branchParam: env || defaultEnv
+      platformParam: formattedArgs?.platform,
+      branchParam: formattedArgs?.env
     });
   }
 
