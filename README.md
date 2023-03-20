@@ -148,7 +148,7 @@ cat ./env.js
 ```
 
 ### `--hotfix`
-
+//TODO hotfix mode build the app on the env default branch, without getting changes from other brnaches
 Yet to come but if you encounter a hotfix to make, here is the process to follow (and that the script will follow):
 
 Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.
