@@ -9,6 +9,9 @@ const { prompt } = require('enquirer');
 const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const PACKAGEJSON_FILE = require(`${appRootPath}/package.json`);
+// eslint-disable-next-line import/no-dynamic-require
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+
 const {
   postAppCenterTriggerBuild,
   generateAppCenterBuildURL,
@@ -273,6 +276,35 @@ const getDistributionToolsetsConfig = async (branchEnvironment, platformDistribu
 });
 
 /**
+ * Create or update appcenter-post-clone.sh file with config variables
+ * @param {Array<string>} variables
+ */
+const manageEnvironmentVariablesFromConfig = () => {
+  const allVariables = CONFIG_FILE.environmentVariables;
+  if (allVariables) {
+    const variables = Object.keys(allVariables);
+    try {
+      const linesToAdd = variables?.map((name) => (`export const ${name} = "\${${name}}";`)).join('\n');
+      printConsoleMessage('Copy Environment variables in appcenter-post-clone script');
+      const postCloneContent = `#!/usr/bin/env bash
+echo "==============================================="
+echo "SETTING env.js FILE"
+echo "==============================================="
+cat > ./env.js <<EOL
+${linesToAdd}
+EOL
+cat ./env.js`;
+      fs.writeFileSync('appcenter-post-clone.sh', postCloneContent);
+    } catch (error) {
+      console.error(error);
+      printConsoleMessage('Failed to copy variables in appcenter-post-clone script');
+    }
+  } else {
+    printConsoleMessage('There is no variable in config file, skipping.');
+  }
+};
+
+/**
  * Get the base toolsets config object from App Center depending on the OS
  * @param  {String} branchEnvironment
  * @param  {String} applicationPlatform
@@ -304,7 +336,7 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
 };
 
 /**
- * Get the Android toolsets config object with every requirements from App Center
+ * Get the Android toolsets config object with every requirement from App Center
  * @param  {{keystoreEncoded:Base64,
  * keystoreFilename:String,
  * keyAlias:String,
@@ -595,4 +627,5 @@ module.exports = {
   manageEnvironmentVariables,
   retrieveEnvConfig,
   handleUpdateConfig,
+  manageEnvironmentVariablesFromConfig,
 };

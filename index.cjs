@@ -3,13 +3,15 @@
 
 // Imports
 const { prompt } = require('enquirer');
-const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, union} = require('./helpers/commonHelpers');
+const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, writeEnvJsFile} = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
 const { triggerAppCenterBuild, createAppCenterDistributionGroups, createAppCenterBranchConfig,
-  manageEnvironmentVariables, retrieveEnvConfig, handleUpdateConfig
+  manageEnvironmentVariablesFromConfig, retrieveEnvConfig, handleUpdateConfig
 } = require('./helpers/appCenterHelpers');
-const {getAppCenterBranchConfig, postAppCenterBranchConfig, putAppCenterBranchConfig} = require("./services/appCenterService");
 const ora = require("ora");
+const appRootPath = require('app-root-path');
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+
 
 const [, , ...args] = process.argv;
 
@@ -76,70 +78,28 @@ const triggerUpdateConfigScript = async () => {
   // await createAppCenterDistributionGroups();
 };
 
-const askForNewVariableValue = async (varList, currentVar, env) => {
-  const askForValue = await prompt({
-    type: 'input',
-    name: 'newValue',
-    initial: varList?.find(({name}) => name === currentVar)?.value,
-    message: `New ${env} value :`
-  })
-  if(varList?.map(({name}) => name)?.includes(currentVar)) {
-    return varList?.map(({name, value}) => {
-      if(name === currentVar) {
-        return {name, value: askForValue.newValue}
-      }
-      return {name, value}
-    })
-  }
-  return varList?.concat([{name: currentVar, value: askForValue.newValue}])
-
-}
-
 const triggerVariableConfigScript = async () => {
-  //Copy .env.js in post-clone script and get project variables
-  const allProjectVariables = await manageEnvironmentVariables();
 
-  // get appCenter config
-  const stagingAndroidConfig = await retrieveEnvConfig('staging', 'android') || [];
-  const stagingIosConfig = await retrieveEnvConfig('staging', 'ios') || [];
-  const preprodAndroidConfig = await retrieveEnvConfig('pre-prod', 'android') || [];
-  const preprodIosConfig = await retrieveEnvConfig('pre-prod', 'ios') || [];
-  const prodAndroidConfig = await retrieveEnvConfig('prod', 'android') || [];
-  const prodIosConfig = await retrieveEnvConfig('prod', 'ios') || [];
-
-  // variables and their values in appCenter config
-  let stagingVariables = union(stagingAndroidConfig?.environmentVariables || [], stagingIosConfig?.environmentVariables || []);
-  let preprodVariables = union(preprodAndroidConfig?.environmentVariables || [], preprodIosConfig?.environmentVariables || []);
-  let prodVariables = union(prodAndroidConfig?.environmentVariables || [], prodIosConfig?.environmentVariables || []);
-
-  //for each variables in env.js
-  for (const variable of allProjectVariables) {
-    //ask user if they want to update variable value in appCenter
-    const updateVariables = await prompt({
-      type: 'confirm',
-      name: 'doUpdate',
-      message: `Do you want to update "${variable}" values?`
-    })
-    if (updateVariables.doUpdate) {
-      // ask for the new value
-      stagingVariables = await askForNewVariableValue(stagingVariables, variable, 'staging');
-      preprodVariables = await askForNewVariableValue(preprodVariables, variable, 'pre-prod');
-      prodVariables = await askForNewVariableValue(prodVariables, variable, 'prod');
+  if(CONFIG_FILE.environmentVariables) {
+    // Update post-clone script
+    manageEnvironmentVariablesFromConfig();
+    // Create env.js with staging values
+    writeEnvJsFile();
+    // for each env
+    for (const environment of ENVIRONMENTS) {
+      const newVariables = Object.entries(CONFIG_FILE.environmentVariables)?.map(([key, value]) => ({ name: key, value: value?.[environment] }));
+      // and each OS
+      for (const platform of PLATFORMS) {
+        //getAppCenter config
+        const appCenterConfig = await retrieveEnvConfig(environment, platform) || [];
+        //Update config with new variables
+        const newConfig = {...appCenterConfig, environmentVariables: newVariables};
+        await handleUpdateConfig(environment, platform, newConfig);
+      }
     }
+  } else {
+    printErrorConsoleMessage('There is no variable in config file.');
   }
-  // Send new values to appCenter for ios and android app and for each environment
-  const newStagingAndroidConfig = {...stagingAndroidConfig, environmentVariables: stagingVariables};
-  const newStagingIosConfig = {...stagingAndroidConfig, environmentVariables: stagingVariables};
-  await handleUpdateConfig('staging','ios', newStagingIosConfig);
-  await handleUpdateConfig('staging','android', newStagingAndroidConfig);
-  const newPreprodAndroidConfig = {...preprodAndroidConfig, environmentVariables: preprodVariables};
-  const newPreprodIosConfig = {...preprodIosConfig, environmentVariables: preprodVariables};
-  await handleUpdateConfig('pre-prod', 'ios', newPreprodIosConfig);
-  await handleUpdateConfig('pre-prod', 'android', newPreprodAndroidConfig);
-  const newProdAndroidConfig = {...prodAndroidConfig, environmentVariables: prodVariables};
-  const newProdIosConfig = {...prodIosConfig, environmentVariables: prodVariables};
-  await handleUpdateConfig('prod', 'ios', newProdIosConfig);
-  await handleUpdateConfig('prod', 'android', newProdAndroidConfig)
 }
 
 const validateCIParams = ({platform, env}) => {
