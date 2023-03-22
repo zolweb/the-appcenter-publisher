@@ -3,7 +3,6 @@
 /* eslint-disable no-console */
 
 const fs = require('fs');
-const readline = require('readline');
 const ora = require('ora');
 const { prompt } = require('enquirer');
 const appRootPath = require('app-root-path');
@@ -168,7 +167,7 @@ const askForAndroidKeyStoreSecrets = async () => {
 };
 
 /**
- * Promp user for the Apple certificate password
+ * Prompt user for the Apple certificate password
  * @return  {Promise<{certificatePassword:String}>}
  */
 const askForAppleCertificatePassword = async () => {
@@ -218,51 +217,6 @@ const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
     console.error('ERR ', error.response.status, error.response.data);
     return {};
   }
-};
-
-/**
- * Get environment variables from env.js file and create or edit appcenter-post-clone.sh file
- * @return  {Array<String>} Array of extracted env variable names
- */
-const manageEnvironmentVariables = async () => {
-  let projectVariables = [];
-
-  try {
-    printConsoleMessage('Copy Environment variables from env.js file');
-
-    const postCloneContent = `#!/usr/bin/env bash
-
-echo "==============================================="
-echo "SETTING env.js FILE"
-echo "==============================================="
-cat > ./env.js <<EOL
-[variables]
-EOL
-cat ./env.js
-    `;
-    const envFileStream = fs.createReadStream(`${appRootPath}/env.js`);
-    let variablesToInsert = [];
-
-    const readLineInterface = readline.createInterface({
-      input: envFileStream,
-      crlfDelay: Infinity,
-    });
-
-    for await (const line of readLineInterface) {
-      const extractedVariable = line.match(/const([^`]*)=/)?.[1]?.trim();
-      if (extractedVariable) {
-        projectVariables = projectVariables.concat(extractedVariable);
-        variablesToInsert = variablesToInsert.concat(`export const ${extractedVariable} = "\${${extractedVariable}}";\n`);
-      }
-    }
-
-    const fileContent = postCloneContent.replace(/\[variables\]/, variablesToInsert.join(''));
-    fs.writeFileSync('appcenter-post-clone.sh', fileContent);
-  } catch (error) {
-    console.error(error);
-    printConsoleMessage('No Environment variables detected');
-  }
-  return projectVariables;
 };
 
 const getDistributionToolsetsConfig = async (branchEnvironment, platformDistributionGroups) => ({
@@ -410,10 +364,7 @@ const sendAppcenterBranchConfig = async (
   const appCenterConfigToSend = {
     badgeIsEnabled: false, // Enable the build status badge
     trigger: APP_CENTER_BRANCH_CONFIG_TRIGGER.MANUAL, // build triggered auto or manual
-    environmentVariables: environmentVariables.map((envVariable) => ({
-      name: envVariable,
-      value: '',
-    })),
+    environmentVariables,
     toolsets,
   };
   // Init Ora loader
@@ -501,7 +452,8 @@ const createAppCenterBranchConfig = async () => {
     appleSecretInformation = await askForAppleCertificatePassword();
   }
 
-  const environmentVariables = await manageEnvironmentVariables();
+  // write app-center-post-clone script and fill env.js file wih staging values
+  manageEnvironmentVariablesFromConfig();
 
   // Iterate through the config platform application Name object keys to get
   // the platform defined by the publishrc file (ios | android)
@@ -513,6 +465,10 @@ const createAppCenterBranchConfig = async () => {
     );
     // For a given platform, iterate through all branches configuration (staging | pre-prod | prod)
     for (const branchEnvironment of Object.keys(CONFIG.git.branches)) {
+      const environmentVariables = Object.entries(CONFIG_FILE.environmentVariables)?.map(
+        ([key, value]) => ({ name: key, value: value?.[branchEnvironment] }),
+      );
+
       let toolsets = {
         javascript: {
           nodeVersion: '16.x',
@@ -624,7 +580,6 @@ module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
   createAppCenterBranchConfig,
-  manageEnvironmentVariables,
   retrieveEnvConfig,
   handleUpdateConfig,
   manageEnvironmentVariablesFromConfig,

@@ -22,8 +22,8 @@ const SCRIPT_PARAMS = {
   VAR_CONFIG: '--add-variable',
 };
 
-const PLATFORMS = ['ios', 'android'];
-const ENVIRONMENTS = ['staging', 'pre-prod', 'prod'];
+const PLATFORMS = Object.keys(CONFIG_FILE.appCenter.appName);
+const ENVIRONMENTS = Object.keys(CONFIG_FILE.git.branches);
 
 const deployPromptQuestions = [
   {
