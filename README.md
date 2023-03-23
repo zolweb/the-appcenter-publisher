@@ -113,42 +113,23 @@ You will need to run the script with this argument only once in your project. As
 
 ### `--update-config`
 
-Yet to come
+Use this command to update project configuration and set up your builds environment. In details it will :
+- check if every branch exists on repo and create them if necessary
+- create the distribution groups Staging and Pre-prod for your App Center applications
+- for each of your App Center applications and your git branches configure properly and link the builds to the right distribution group
+
 
 ### `--add-variable`
 
-Run this script when you need to add an environment variable to your projet. You first need to write the variable in `env.js` and export it then the script will :
-- Copy all the variables needed in the postclone script (the one that is responsible for copying the values from appCenter config to your env file)
-- Update values for each environment variable, on each environment and both platforms
+Run this script when you need to add an environment variable to your project. You need to add all variables and their values per environment in `.publishrc` file.
+This script will take this variables and : 
+- update `appcenter-post-clone.sh` script 
+- add all staging variables in `env.js` file
+- update appCenter config for each environment and each platform.
 
-Exemple of `env.js` file format : 
-```js
-const BUILD_ENV = 'staging';
-const API_URL = 'https://reqres.in/api';
-
-export default {
-  BUILD_ENV,
-  API_URL,
-};
-```
-...and its associated `appcenter-post-clone.sh` :
-```shell
-#!/usr/bin/env bash
-
-echo "==============================================="
-echo "SETTING env.js FILE"
-echo "==============================================="
-cat > ./env.js <<EOL
-export const BUILD_ENV = "${BUILD_ENV}";
-export const API_URL = "${API_URL}";
-
-EOL
-cat ./env.js
-    
-```
 
 ### `--hotfix`
-//TODO hotfix mode build the app on the env default branch, without getting changes from other brnaches
+//TODO hotfix mode build the app on the env default branch, without getting changes from other branches
 Yet to come but if you encounter a hotfix to make, here is the process to follow (and that the script will follow):
 
 Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.

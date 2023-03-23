@@ -1,12 +1,16 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
+/* eslint-disable no-console */
+
 const fs = require('fs');
-const readline = require('readline');
 const ora = require('ora');
 const { prompt } = require('enquirer');
 const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const PACKAGEJSON_FILE = require(`${appRootPath}/package.json`);
+// eslint-disable-next-line import/no-dynamic-require
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+
 const {
   postAppCenterTriggerBuild,
   generateAppCenterBuildURL,
@@ -90,7 +94,6 @@ const triggerAppCenterBuild = async (platformList, branch) => {
       ));
     } else {
       triggerBuildLoader.fail(`The ${platform} build was not triggered.\n`);
-      // eslint-disable-next-line no-console
       console.error('ERR ', triggerBuildQueryRes.status);
     }
   }
@@ -164,7 +167,7 @@ const askForAndroidKeyStoreSecrets = async () => {
 };
 
 /**
- * Promp user for the Apple certificate password
+ * Prompt user for the Apple certificate password
  * @return  {Promise<{certificatePassword:String}>}
  */
 const askForAppleCertificatePassword = async () => {
@@ -211,56 +214,9 @@ const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
     };
   } catch (error) {
     uploadCertificateLoader.fail('Could not create upload Apple Certificate and Provisioning Profile\n');
-    // eslint-disable-next-line no-console
     console.error('ERR ', error.response.status, error.response.data);
     return {};
   }
-};
-
-/**
- * Get environment variables from env.js file and create or edit appcenter-post-clone.sh file
- * @return  {Array<String>} Array of extracted env variable names
- */
-const manageEnvironmentVariables = async () => {
-  let projectVariables = [];
-
-  try {
-    printConsoleMessage('Copy Environment variables from env.js file');
-
-    const postCloneContent = `#!/usr/bin/env bash
-
-echo "==============================================="
-echo "SETTING env.js FILE"
-echo "==============================================="
-cat > ./env.js <<EOL
-[variables]
-EOL
-cat ./env.js
-    `;
-    const envFileStream = fs.createReadStream(`${appRootPath}/env.js`);
-    let variablesToInsert = [];
-
-    const readLineInterface = readline.createInterface({
-      input: envFileStream,
-      crlfDelay: Infinity,
-    });
-
-    for await (const line of readLineInterface) {
-      const extractedVariable = line.match(/const([^`]*)=/)?.[1]?.trim();
-      if (extractedVariable) {
-        projectVariables = projectVariables.concat(extractedVariable);
-        variablesToInsert = variablesToInsert.concat(`export const ${extractedVariable} = "\${${extractedVariable}}";\n`);
-      }
-    }
-
-    const fileContent = postCloneContent.replace(/\[variables\]/, variablesToInsert.join(''));
-    fs.writeFileSync('appcenter-post-clone.sh', fileContent);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-    printConsoleMessage('No Environment variables detected');
-  }
-  return projectVariables;
 };
 
 const getDistributionToolsetsConfig = async (branchEnvironment, platformDistributionGroups) => ({
@@ -272,6 +228,35 @@ const getDistributionToolsetsConfig = async (branchEnvironment, platformDistribu
     isSilent: false,
   },
 });
+
+/**
+ * Create or update appcenter-post-clone.sh file with config variables
+ * @param {Array<string>} variables
+ */
+const manageEnvironmentVariablesFromConfig = () => {
+  const allVariables = CONFIG_FILE.environmentVariables;
+  if (allVariables) {
+    const variables = Object.keys(allVariables);
+    try {
+      const linesToAdd = variables?.map((name) => (`export const ${name} = "\${${name}}";`)).join('\n');
+      printConsoleMessage('Copy Environment variables in appcenter-post-clone script');
+      const postCloneContent = `#!/usr/bin/env bash
+echo "==============================================="
+echo "SETTING env.js FILE"
+echo "==============================================="
+cat > ./env.js <<EOL
+${linesToAdd}
+EOL
+cat ./env.js`;
+      fs.writeFileSync('appcenter-post-clone.sh', postCloneContent);
+    } catch (error) {
+      console.error(error);
+      printConsoleMessage('Failed to copy variables in appcenter-post-clone script');
+    }
+  } else {
+    printConsoleMessage('There is no variable in config file, skipping.');
+  }
+};
 
 /**
  * Get the base toolsets config object from App Center depending on the OS
@@ -298,7 +283,6 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
     }
   } catch (error) {
     branchToolsetsLoader.fail(`Could not retrieve ${toolsetsLoaderString}\n`);
-    // eslint-disable-next-line no-console
     console.error('ERR ', error.response.status, error.response.data);
   }
 
@@ -306,7 +290,7 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
 };
 
 /**
- * Get the Android toolsets config object with every requirements from App Center
+ * Get the Android toolsets config object with every requirement from App Center
  * @param  {{keystoreEncoded:Base64,
  * keystoreFilename:String,
  * keyAlias:String,
@@ -417,10 +401,7 @@ const sendAppcenterBranchConfig = async (
   const appCenterConfigToSend = {
     badgeIsEnabled: false, // Enable the build status badge
     trigger: APP_CENTER_BRANCH_CONFIG_TRIGGER.MANUAL, // build triggered auto or manual
-    environmentVariables: environmentVariables.map((envVariable) => ({
-      name: envVariable,
-      value: '',
-    })),
+    environmentVariables,
     toolsets,
   };
   // Init Ora loader
@@ -444,7 +425,6 @@ const sendAppcenterBranchConfig = async (
       await handleUpdateConfig(branchEnvironment, applicationPlatform, appCenterConfigToSend);
     } else {
       branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
-      // eslint-disable-next-line no-console
       console.error('ERR ', error.response.status, error.response.data);
     }
   }
@@ -513,7 +493,6 @@ const createAppCenterDistributionGroups = async () => {
           distributionGroupLoader.succeed(`\x1b[1m${distributionGroupConsoleString} already exists, skipping\x1b[0m`);
         } else {
           distributionGroupLoader.fail(`Could not create ${distributionGroupConsoleString}\n`);
-          // eslint-disable-next-line no-console
           console.error('ERR ', error.response.status);
         }
       }
@@ -522,7 +501,7 @@ const createAppCenterDistributionGroups = async () => {
 };
 
 /**
- * Create or update config in AppCenter
+ * Create config for every branch and both platform
  * @returns {Promise<void>}
  */
 const createAppCenterBranchConfig = async () => {
@@ -541,7 +520,8 @@ const createAppCenterBranchConfig = async () => {
     appleSecretInformation = await askForAppleCertificatePassword();
   }
 
-  const environmentVariables = await manageEnvironmentVariables();
+  // write app-center-post-clone script and fill env.js file wih staging values
+  manageEnvironmentVariablesFromConfig();
 
   // Iterate through the config platform application Name object keys to get
   // the platform defined by the publishrc file (ios | android)
@@ -553,6 +533,10 @@ const createAppCenterBranchConfig = async () => {
     );
     // For a given platform, iterate through all branches configuration (staging | pre-prod | prod)
     for (const branchEnvironment of Object.keys(CONFIG.git.branches)) {
+      const environmentVariables = Object.entries(CONFIG_FILE.environmentVariables)?.map(
+        ([key, value]) => ({ name: key, value: value?.[branchEnvironment] }),
+      );
+
       let toolsets = {
         javascript: {
           nodeVersion: '16.x',
@@ -602,7 +586,7 @@ module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
   createAppCenterBranchConfig,
-  manageEnvironmentVariables,
   retrieveEnvConfig,
   handleUpdateConfig,
+  manageEnvironmentVariablesFromConfig,
 };

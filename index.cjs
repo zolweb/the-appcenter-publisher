@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-
 /* eslint-disable no-console */
+
 // Imports
 const { prompt } = require('enquirer');
-const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, union} = require('./helpers/commonHelpers');
+const { validateProjectConfig, getConfigObject, printErrorConsoleMessage, writeEnvJsFile} = require('./helpers/commonHelpers');
 const { manageGitFlow, manageGitBranches } = require('./helpers/gitHelpers');
 const { triggerAppCenterBuild, createAppCenterDistributionGroups, createAppCenterBranchConfig,
-  manageEnvironmentVariables, retrieveEnvConfig, handleUpdateConfig
+  manageEnvironmentVariablesFromConfig, retrieveEnvConfig, handleUpdateConfig
 } = require('./helpers/appCenterHelpers');
-const {getAppCenterBranchConfig, postAppCenterBranchConfig, putAppCenterBranchConfig} = require("./services/appCenterService");
 const ora = require("ora");
+const appRootPath = require('app-root-path');
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+
 
 const [, , ...args] = process.argv;
 
@@ -20,8 +22,8 @@ const SCRIPT_PARAMS = {
   VAR_CONFIG: '--add-variable',
 };
 
-const PLATFORMS = ['ios', 'android'];
-const ENVIRONMENTS = ['staging', 'pre-prod', 'prod'];
+const PLATFORMS = Object.keys(CONFIG_FILE.appCenter.appName);
+const ENVIRONMENTS = Object.keys(CONFIG_FILE.git.branches);
 
 const deployPromptQuestions = [
   {
@@ -69,74 +71,32 @@ const triggerInitConfigScript = async () => {
   await createAppCenterBranchConfig();
 };
 
-const askForNewVariableValue = async (varList, currentVar, env) => {
-  const askForValue = await prompt({
-    type: 'input',
-    name: 'newValue',
-    initial: varList?.find(({name}) => name === currentVar)?.value,
-    message: `New ${env} value :`
-  })
-  if(varList?.map(({name}) => name)?.includes(currentVar)) {
-    return varList?.map(({name, value}) => {
-      if(name === currentVar) {
-        return {name, value: askForValue.newValue}
-      }
-      return {name, value}
-    })
-  }
-  return varList?.concat([{name: currentVar, value: askForValue.newValue}])
-
-}
-
 const triggerVariableConfigScript = async () => {
-  //Copy .env.js in post-clone script and get project variables
-  const allProjectVariables = await manageEnvironmentVariables();
 
-  // get appCenter config
-  const stagingAndroidConfig = await retrieveEnvConfig('staging', 'android') || [];
-  const stagingIosConfig = await retrieveEnvConfig('staging', 'ios') || [];
-  const stagingConfig = union(stagingAndroidConfig, stagingIosConfig);
-  const preprodAndroidConfig = await retrieveEnvConfig('pre-prod', 'android') || [];
-  const preprodIosConfig = await retrieveEnvConfig('pre-prod', 'ios') || [];
-  const preprodConfig = union(preprodAndroidConfig, preprodIosConfig)
-  const prodAndroidConfig = await retrieveEnvConfig('prod', 'android') || [];
-  const prodIosConfig = await retrieveEnvConfig('prod', 'ios') || [];
-  const prodConfig = union(prodAndroidConfig, prodIosConfig);
-
-  // variables and their values in appCenter config
-  let stagingVariables = stagingConfig?.environmentVariables || [];
-  let preprodVariables = preprodConfig?.environmentVariables || [];
-  let prodVariables = prodConfig?.environmentVariables || [];
-
-  //for each variables in env.js
-  for (const variable of allProjectVariables) {
-    //ask user if he/she wants to update variable value in appCenter
-    const updateVariables = await prompt({
-      type: 'confirm',
-      name: 'doUpdate',
-      message: `Do you want to update "${variable}" values?`
-    })
-    if (updateVariables.doUpdate) {
-      // ask for the new value
-      stagingVariables = await askForNewVariableValue(stagingVariables, variable, 'staging');
-      preprodVariables = await askForNewVariableValue(preprodVariables, variable, 'pre-prod');
-      prodVariables = await askForNewVariableValue(prodVariables, variable, 'prod');
+  if(CONFIG_FILE.environmentVariables) {
+    // Update post-clone script
+    manageEnvironmentVariablesFromConfig();
+    // Create env.js with staging values
+    writeEnvJsFile();
+    // for each env
+    for (const environment of ENVIRONMENTS) {
+      const newVariables = Object.entries(CONFIG_FILE.environmentVariables)?.map(([key, value]) => ({ name: key, value: value?.[environment] }));
+      // and each OS
+      for (const platform of PLATFORMS) {
+        //getAppCenter config
+        const appCenterConfig = await retrieveEnvConfig(environment, platform) || [];
+        //Update config with new variables
+        const newConfig = {...appCenterConfig, environmentVariables: newVariables};
+        await handleUpdateConfig(environment, platform, newConfig);
+      }
     }
+  } else {
+    printErrorConsoleMessage('There is no variable in config file.');
   }
-  // Send new values to appCenter for ios and android app and for each environment
-  const newStagingConfig = {...stagingConfig, environmentVariables: stagingVariables};
-  await handleUpdateConfig('staging','ios', newStagingConfig);
-  await handleUpdateConfig('staging','android', newStagingConfig);
-  const newPreprodConfig = {...preprodConfig, environmentVariables: preprodVariables};
-  await handleUpdateConfig('pre-prod', 'ios', newPreprodConfig);
-  await handleUpdateConfig('pre-prod', 'android', newPreprodConfig);
-  const newProdConfig = {...prodConfig, environmentVariables: prodVariables};
-  await handleUpdateConfig('prod', 'ios', newProdConfig);
-  await handleUpdateConfig('prod', 'android', newProdConfig)
 }
 
 const validateCIParams = ({platform, env}) => {
-  if(platform && !PLATFORMS?.includes(platform)) {
+  if( !PLATFORMS?.includes(platform) && !Array.isArray(platform)) {
     printErrorConsoleMessage(`platform param is incorrect, possible values are : ${PLATFORMS?.join(' or ')}. Leave empty for both`);
     process.exit(1);
   }
@@ -164,15 +124,21 @@ async function startScript() {
   }
 
   if (isCI) {
-    const defaultPlatform = ['android', 'ios'];
     const defaultEnv = 'staging';
-    const platform = args.find((item) => item?.includes('platform'))?.split(':')?.pop();
-    const env = args.find((item) => item?.includes('env'))?.split(':')?.pop();
-    validateCIParams({platform, env});
+    const formattedArgs = args.reduce((acc, item) => {
+      if(item?.includes('platform')) {
+        return Object.assign(acc, {platform: item?.split(':')?.pop()});
+      }
+      if(item?.includes('env')) {
+        return Object.assign(acc, {env: item?.split(':')?.pop()});
+      }
+      return acc;
+    }, {platform: PLATFORMS, env: defaultEnv});
+    validateCIParams(formattedArgs);
     return triggerDeployScript({
       isCi: true,
-      platformParam: platform ? [platform] : defaultPlatform,
-      branchParam: env || defaultEnv
+      platformParam: formattedArgs?.platform,
+      branchParam: formattedArgs?.env
     });
   }
 

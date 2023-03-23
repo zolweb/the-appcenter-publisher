@@ -2,6 +2,7 @@
 const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+const fs = require('fs');
 
 const DEFAULT_CONFIG = {
   startingVersionNumber: '1.0.0',
@@ -80,14 +81,33 @@ const getConfigObject = () => ({
   },
 });
 
-const union = (arrayA, arrayB) => {
-  const merge = arrayA?.concat(arrayB);
-  return merge?.reduce((acc, item) => {
-    if (acc?.includes(item)) {
-      return acc;
-    }
-    return acc?.concat([item]);
-  }, []);
+// const BUILD_ENV = 'prod'; //dev, staging, preprod, prod
+// const API_URL = 'https://reqres.in/api';
+//
+// export default {
+//   BUILD_ENV,
+//   API_URL,
+// };
+
+/**
+ * Write env.js file using staging environment variables from config file
+ */
+const writeEnvJsFile = () => {
+  const allVariables = CONFIG_FILE.environmentVariables;
+  printConsoleMessage('Writing env.js file with staging variables');
+
+  if (allVariables) {
+    const stagingVariables = Object.entries(allVariables)?.map(([key, value]) => ({ [key]: value?.staging }));
+    const fileContent = `${stagingVariables?.map((envVar) => `const ${Object.keys(envVar)} = '${Object.values(envVar)}';`).join('\n')}
+
+export default {
+${stagingVariables?.map((item) => `  ${Object.keys(item)},`).join('\n')}
+};
+`;
+    fs.writeFileSync('env.js', fileContent);
+  } else {
+    printConsoleMessage('There is no variable in config file, skipping.');
+  }
 };
 
 module.exports = {
@@ -95,5 +115,5 @@ module.exports = {
   printErrorConsoleMessage,
   validateProjectConfig,
   getConfigObject,
-  union,
+  writeEnvJsFile,
 };
