@@ -58,36 +58,56 @@ You can go with the basic configuration or further customize your building proce
 
 ```javascript
 module.exports = {
-  startingVersionNumber: '1.0.0', // This number will be used as versionning starting point
-  appCenter: {
-    userName: 'my_username',
-    token: 'my_token',
-    appName: {
-      ios: 'appname-ios',
-      android: 'appname-android',
+    startingVersionNumber: '1.0.0', // This number will be used as versionning starting point
+    appCenter: {
+        userName: 'my_username',
+        token: 'my_token',
+        appName: {
+            ios: 'appname-ios',
+            android: 'appname-android',
+        },
+        keystorePath: './secrets/keystore.jks', // path to your Android keystore file
+        appleCertificatePath: './secrets/certificate20230812.p12', // path to your Apple Certificate
+        appleProvisioningProfilePath: {
+            staging: './secrets/profiles/appname-adhoc20230812.mobileprovision',
+            'pre-prod': './secrets/profiles/appname-adhoc20230812.mobileprovision',
+            prod: './secrets/profiles/appname-distribution20230812.mobileprovision'
+        },
+        autoIncrementBuildNumber: true,
+        buildAndroidAppBundle: 'prod', // always - prod - none / if you want App Center to build an App Bundle instead of an .apk
     },
-    keystorePath: './secrets/keystore.jks', // path to your Android keystore file
-    appleCertificatePath: './secrets/certificate20230812.p12', // path to your Apple Certificate
-    appleProvisioningProfilePath: {
-      staging: './secrets/profiles/appname-adhoc20230812.mobileprovision',
-      'pre-prod': './secrets/profiles/appname-adhoc20230812.mobileprovision',
-      prod: './secrets/profiles/appname-distribution20230812.mobileprovision'
+    git: {
+        repoURL: 'https://gitlab.com/[my_team]/[my_project]/',
+        branches: {
+            staging: 'develop', // Your git branch name pointing to your staging env
+            'pre-prod': 'pre-prod', // Your git branch name pointing to your pre-production env
+            prod: 'main', // Your git branch name pointing to your production env
+        },
+        commitPrefixes: {
+            feature: '[+]', // custom your commit prefix to identify new feature in changelog
+            bugFix: '[#]', // custom your commit prefix to identify bug fixes in changelog
+        }
     },
-    autoIncrementBuildNumber: true,
-    buildAndroidAppBundle: 'prod', // always - prod - none / if you want App Center to build an App Bundle instead of an .apk
-  },
-  git: {
-    repoURL: 'https://gitlab.com/[my_team]/[my_project]/',
-    branches: {
-      staging: 'develop', // Your git branch name pointing to your staging env
-      'pre-prod': 'pre-prod', // Your git branch name pointing to your pre-production env
-      prod: 'main', // Your git branch name pointing to your production env
-    },
-    commitPrefixes: {
-      feature: '[+]', // custom your commit prefix to identify new feature in changelog
-      bugFix: '[#]', // custom your commit prefix to identify bug fixes in changelog
+    environmentVariables: {
+        BUILD_ENV: {
+            local: '',
+            staging: '',
+            'pre-prod': '',
+            prod: '',
+        },
+        API_URL: {
+            local: 'localhost/reqres.in/api',
+            staging: 'https://reqres.in/api',
+            'pre-prod': 'https://reqres.in/api',
+            prod: 'https://reqres.in/api',
+        },
+        TEST: {
+            local: 'test.local',
+            staging: 'test.staging',
+            'pre-prod': 'test.preprod',
+            prod: 'test.prod',
+        }
     }
-  }
 }
 ```
 
