@@ -3,6 +3,7 @@ const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
 const fs = require('fs');
+const { PROMPT_PLATFORMS, PROMPT_ENVIRONMENTS } = require('./constants');
 
 const DEFAULT_CONFIG = {
   startingVersionNumber: '1.0.0',
@@ -81,32 +82,36 @@ const getConfigObject = () => ({
   },
 });
 
-// const BUILD_ENV = 'prod'; //dev, staging, preprod, prod
-// const API_URL = 'https://reqres.in/api';
-//
-// export default {
-//   BUILD_ENV,
-//   API_URL,
-// };
-
 /**
- * Write env.js file using staging environment variables from config file
+ * Write env.js file using local environment variables from config file
  */
 const writeEnvJsFile = () => {
+  printConsoleMessage('Writing env.js file with local variables');
+
   const allVariables = CONFIG_FILE.environmentVariables;
-  printConsoleMessage('Writing env.js file with staging variables');
 
   if (allVariables) {
-    const stagingVariables = Object.entries(allVariables)?.map(([key, value]) => ({ [key]: value?.staging }));
-    const fileContent = `${stagingVariables?.map((envVar) => `const ${Object.keys(envVar)} = '${Object.values(envVar)}';`).join('\n')}
-
-export default {
-${stagingVariables?.map((item) => `  ${Object.keys(item)},`).join('\n')}
-};
-`;
+    const localVariables = Object.entries(allVariables)?.map(([key, value]) => ({ [key]: value?.staging }));
+    const fileContent = `${localVariables?.map((envVar) => `export const ${Object.keys(envVar)} = '${Object.values(envVar)}';`).join('\n')}\n`;
     fs.writeFileSync('env.js', fileContent);
   } else {
     printConsoleMessage('There is no variable in config file, skipping.');
+  }
+};
+
+/**
+ * Validation ofr params given to CI mode
+ * @param platform
+ * @param env
+ */
+const validateCIParams = ({ platform, env }) => {
+  if (!PROMPT_PLATFORMS?.includes(platform) && !Array.isArray(platform)) {
+    printErrorConsoleMessage(`platform param is incorrect, possible values are : ${PLATFORMS?.join(' or ')}. Leave empty for both`);
+    process.exit(1);
+  }
+  if (env && !PROMPT_ENVIRONMENTS?.includes(env)) {
+    printErrorConsoleMessage(`env param is incorrect, possible values are : ${ENVIRONMENTS?.join(' or ')}.`);
+    process.exit(1);
   }
 };
 
@@ -116,4 +121,5 @@ module.exports = {
   validateProjectConfig,
   getConfigObject,
   writeEnvJsFile,
+  validateCIParams,
 };
