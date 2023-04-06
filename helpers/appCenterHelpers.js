@@ -1,12 +1,15 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-syntax */
+
 const fs = require('fs');
-const readline = require('readline');
 const ora = require('ora');
 const { prompt } = require('enquirer');
 const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const PACKAGEJSON_FILE = require(`${appRootPath}/package.json`);
+// eslint-disable-next-line import/no-dynamic-require
+const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+
 const {
   postAppCenterTriggerBuild,
   generateAppCenterBuildURL,
@@ -15,9 +18,11 @@ const {
   postAppCenterBranchConfig,
   postAppCenterFileAsset,
   getAppCenterDistributionGroups,
-  getAppCenterAppToolsets,
+  getAppCenterAppToolsets, getAppCenterBranchConfig, putAppCenterBranchConfig,
 } = require('../services/appCenterService');
-const { getConfigObject, printConsoleMessage } = require('./commonHelpers');
+const {
+  getConfigObject, printConsoleMessage, printErrorConsoleMessage, writeEnvJsFile,
+} = require('./commonHelpers');
 
 const CONFIG = getConfigObject();
 
@@ -90,8 +95,7 @@ const triggerAppCenterBuild = async (platformList, branch) => {
       ));
     } else {
       triggerBuildLoader.fail(`The ${platform} build was not triggered.\n`);
-      // eslint-disable-next-line no-console
-      console.error('ERR ', triggerBuildQueryRes.status);
+      printErrorConsoleMessage(triggerBuildQueryRes.status);
     }
   }
 
@@ -164,7 +168,7 @@ const askForAndroidKeyStoreSecrets = async () => {
 };
 
 /**
- * Promp user for the Apple certificate password
+ * Prompt user for the Apple certificate password
  * @return  {Promise<{certificatePassword:String}>}
  */
 const askForAppleCertificatePassword = async () => {
@@ -211,56 +215,9 @@ const manageAppleCertificateAndProfiles = async (branchEnvironment) => {
     };
   } catch (error) {
     uploadCertificateLoader.fail('Could not create upload Apple Certificate and Provisioning Profile\n');
-    // eslint-disable-next-line no-console
-    console.error('ERR ', error.response.status, error.response.data);
+    printErrorConsoleMessage(`${error.response.status} ${error.response.data}`);
     return {};
   }
-};
-
-/**
- * Get environment variables from env.js file and create or edit appcenter-post-clone.sh file
- * @return  {Array<String>} Array of extracted env variable names
- */
-const manageEnvironmentVariables = async () => {
-  let projectVariables = [];
-
-  try {
-    printConsoleMessage('Copy Environment variables from env.js file');
-
-    const postCloneContent = `#!/usr/bin/env bash
-
-echo "==============================================="
-echo "SETTING env.js FILE"
-echo "==============================================="
-cat > ./env.js <<EOL
-[variables]
-EOL
-cat ./env.js
-    `;
-    const envFileStream = fs.createReadStream(`${appRootPath}/env.js`);
-    let variablesToInsert = [];
-
-    const readLineInterface = readline.createInterface({
-      input: envFileStream,
-      crlfDelay: Infinity,
-    });
-
-    for await (const line of readLineInterface) {
-      const extractedVariable = line.match(/const([^`]*)=/)?.[1]?.trim();
-      if (extractedVariable) {
-        projectVariables = projectVariables.concat(extractedVariable);
-        variablesToInsert = variablesToInsert.concat(`export const ${extractedVariable} = "\${${extractedVariable}}";\n`);
-      }
-    }
-
-    const fileContent = postCloneContent.replace(/\[variables\]/, variablesToInsert.join(''));
-    fs.writeFileSync('appcenter-post-clone.sh', fileContent);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(error);
-    printConsoleMessage('No Environment variables detected');
-  }
-  return projectVariables;
 };
 
 const getDistributionToolsetsConfig = async (branchEnvironment, platformDistributionGroups) => ({
@@ -272,6 +229,34 @@ const getDistributionToolsetsConfig = async (branchEnvironment, platformDistribu
     isSilent: false,
   },
 });
+
+/**
+ * Create or update appcenter-post-clone.sh file with config variables
+ * @param {Array<string>} variables
+ */
+const manageEnvironmentVariablesFromConfig = () => {
+  const allVariables = CONFIG_FILE.environmentVariables;
+  if (allVariables) {
+    const variables = Object.keys(allVariables);
+    try {
+      printConsoleMessage('Copy Environment variables in appcenter-post-clone script');
+      const linesToAdd = variables?.map((name) => (`export const ${name} = "\${${name}}";`)).join('\n');
+      const postCloneContent = `#!/usr/bin/env bash
+echo "==============================================="
+echo "SETTING env.js FILE"
+echo "==============================================="
+cat > ./env.js <<EOL
+${linesToAdd}
+EOL
+cat ./env.js`;
+      fs.writeFileSync('appcenter-post-clone.sh', postCloneContent);
+    } catch (error) {
+      printErrorConsoleMessage('Failed to copy variables in appcenter-post-clone script');
+    }
+  } else {
+    printConsoleMessage('There is no variable in config file, skipping.');
+  }
+};
 
 /**
  * Get the base toolsets config object from App Center depending on the OS
@@ -298,15 +283,14 @@ const getProjectToolsetsConfig = async (branchEnvironment, applicationPlatform) 
     }
   } catch (error) {
     branchToolsetsLoader.fail(`Could not retrieve ${toolsetsLoaderString}\n`);
-    // eslint-disable-next-line no-console
-    console.error('ERR ', error.response.status, error.response.data);
+    printErrorConsoleMessage(`${error.response.status} ${error.response.data}`);
   }
 
   return undefined;
 };
 
 /**
- * Get the Android toolsets config object with every requirements from App Center
+ * Get the Android toolsets config object with every requirement from App Center
  * @param  {{keystoreEncoded:Base64,
  * keystoreFilename:String,
  * keyAlias:String,
@@ -380,10 +364,7 @@ const sendAppcenterBranchConfig = async (
   const appCenterConfigToSend = {
     badgeIsEnabled: false, // Enable the build status badge
     trigger: APP_CENTER_BRANCH_CONFIG_TRIGGER.MANUAL, // build triggered auto or manual
-    environmentVariables: environmentVariables.map((envVariable) => ({
-      name: envVariable,
-      value: '',
-    })),
+    environmentVariables,
     toolsets,
   };
   // Init Ora loader
@@ -406,8 +387,7 @@ const sendAppcenterBranchConfig = async (
       branchConfigLoader.fail(`A ${envLoaderString} already exists, please update instead.\n`);
     } else {
       branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
-      // eslint-disable-next-line no-console
-      console.error('ERR ', error.response.status, error.response.data);
+      printErrorConsoleMessage(`${error.response.status} ${JSON.stringify(error.response.data)}`);
     }
   }
 };
@@ -445,15 +425,18 @@ const createAppCenterDistributionGroups = async () => {
           distributionGroupLoader.succeed(`\x1b[1m${distributionGroupConsoleString} already exists, skipping\x1b[0m`);
         } else {
           distributionGroupLoader.fail(`Could not create ${distributionGroupConsoleString}\n`);
-          // eslint-disable-next-line no-console
-          console.error('ERR ', error.response.status);
+          printErrorConsoleMessage(error.response.status);
         }
       }
     }
   }
 };
 
-const updateAppCenterBranchConfig = async () => {
+/**
+ * Create config for every branch and both platform
+ * @returns {Promise<void>}
+ */
+const createAppCenterBranchConfig = async () => {
   let keystoreSecretInformation = {};
   let appleSecretInformation = {};
 
@@ -469,7 +452,8 @@ const updateAppCenterBranchConfig = async () => {
     appleSecretInformation = await askForAppleCertificatePassword();
   }
 
-  const environmentVariables = await manageEnvironmentVariables();
+  // write app-center-post-clone script and fill env.js file wih staging values
+  manageEnvironmentVariablesFromConfig();
 
   // Iterate through the config platform application Name object keys to get
   // the platform defined by the publishrc file (ios | android)
@@ -479,8 +463,22 @@ const updateAppCenterBranchConfig = async () => {
       CONFIG.appCenter.appName[applicationPlatform],
       CONFIG.appCenter.userName,
     );
+
+    const variablesByEnv = Object.entries(CONFIG_FILE.environmentVariables)?.reduce((acc, [key, value]) => {
+      let newValue = {};
+      Object.keys(CONFIG.git.branches)?.forEach((env) => {
+        newValue = Object.assign(newValue, {
+          [env]: (acc?.[env] || []).concat([{
+            name: key, value: value?.[env],
+          }]),
+        });
+      });
+      return newValue;
+    }, {});
     // For a given platform, iterate through all branches configuration (staging | pre-prod | prod)
     for (const branchEnvironment of Object.keys(CONFIG.git.branches)) {
+      const environmentVariables = variablesByEnv?.[branchEnvironment];
+
       let toolsets = {
         javascript: {
           nodeVersion: '16.x',
@@ -527,8 +525,103 @@ const updateAppCenterBranchConfig = async () => {
   }
 };
 
+/**
+ * Get appCenter config for a specific env
+ * @param {'staging'|'pre-prod'|'prod'} env
+ * @param {'ios'|'android'} platform
+ * @returns {Promise<void>}
+ */
+const retrieveEnvConfig = async (env, platform) => {
+  const branchConfigLoader = ora().start(`\x1b[1mGet ${platform} ${env} AppCenter config\x1b[0m\n`);
+  try {
+    const getBranchConfig = await getAppCenterBranchConfig(
+      CONFIG.appCenter.appName?.[platform],
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+    );
+
+    if ([200, 201].includes(getBranchConfig.status)) {
+      branchConfigLoader.succeed(`\x1b[1m Get ${platform} ${env} AppCenter config with success !\x1b[0m`);
+      return getBranchConfig?.data;
+    }
+  } catch (error) {
+    branchConfigLoader.fail('Could not get config\n');
+    printErrorConsoleMessage('ERR ', error?.response?.status, error?.response?.data);
+  }
+  return null;
+};
+
+/**
+ * Update appCenter config for a specific env
+ * @param {'staging'|'pre-prod'|'prod'} env
+ * @param {'ios'|'android'} platform * @param {object} newConfig
+ * @returns {Promise<void>}
+ */
+const handleUpdateConfig = async (env, platform, newConfig) => {
+  const branchConfigLoader = ora().start(`\x1b[1mUpdate appCenter ${env} config on ${platform}\x1b[0m\n`);
+  try {
+    // Send API Call
+    const configQueryRes = await putAppCenterBranchConfig(
+      CONFIG.appCenter.appName?.[platform],
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+      {
+        ...newConfig,
+        environmentVariables: newConfig?.environmentVariables,
+      },
+    );
+    if ([200, 201].includes(configQueryRes.status)) {
+      branchConfigLoader.succeed(`\x1b[1m App center ${platform} ${env} config updated with success !\x1b[0m`);
+    }
+  } catch (error) {
+    if (error.response.status === 404) {
+      branchConfigLoader.succeed(`Config of ${platform} for ${env} doesn't exist, please create branch configuration, skipping\n`);
+    } else {
+      branchConfigLoader.fail(`Could not update config on ${platform} ${env}\n`);
+      printErrorConsoleMessage(`${error?.response?.status} ${error?.response?.data}`);
+    }
+  }
+};
+
+/**
+ * Update project environment variables
+ * @returns {Promise<void>}
+ */
+const triggerVariableConfigScript = async () => {
+  if (CONFIG_FILE.environmentVariables) {
+    // Update post-clone script
+    manageEnvironmentVariablesFromConfig();
+    // Create env.js with staging values
+    writeEnvJsFile();
+    try {
+      // for each env
+      for (const environment of Object.keys(CONFIG_FILE.git.branches)) {
+        const newVariables = Object.entries(CONFIG_FILE.environmentVariables)?.map(
+          ([key, value]) => ({ name: key, value: value?.[environment] }),
+        );
+        // and each OS
+        for (const platform of Object.keys(CONFIG_FILE.appCenter.appName)) {
+          // getAppCenter config
+          const appCenterConfig = await retrieveEnvConfig(environment, platform) || [];
+          // Update config with new variables
+          const newConfig = { ...appCenterConfig, environmentVariables: newVariables };
+          await handleUpdateConfig(environment, platform, newConfig);
+        }
+      }
+    } catch (err) {
+      printErrorConsoleMessage('Failed to update environment variables.');
+    }
+  } else {
+    printErrorConsoleMessage('There is no variable in config file.');
+  }
+};
+
 module.exports = {
   triggerAppCenterBuild,
   createAppCenterDistributionGroups,
-  updateAppCenterBranchConfig,
+  createAppCenterBranchConfig,
+  retrieveEnvConfig,
+  handleUpdateConfig,
+  manageEnvironmentVariablesFromConfig,
+  triggerVariableConfigScript,
 };

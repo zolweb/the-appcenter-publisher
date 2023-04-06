@@ -44,6 +44,23 @@ const postAppCenterNewDistributionGroup = (appName, userName, groupInfo) => APPC
 const postAppCenterBranchConfig = (appName, userName, gitBranch, appCenterConfig) => APPCENTER_API_CLIENT.post(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/config`, appCenterConfig);
 
 /**
+ * @param  {String} appName
+ * @param  {String} userName
+ * @param  {String} gitBranch
+ * @param  {Object} appCenterConfig
+ * @return {Promise<Axios>}
+ */
+const putAppCenterBranchConfig = (appName, userName, gitBranch, appCenterConfig) => APPCENTER_API_CLIENT.put(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/config`, appCenterConfig);
+
+/**
+ * @param  {String} appName
+ * @param  {String} userName
+ * @param  {String} gitBranch
+ * @return {Promise<Axios>}
+ */
+const getAppCenterBranchConfig = (appName, userName, gitBranch) => APPCENTER_API_CLIENT.get(`/api/v0.1/apps/${userName}/${appName}/branches/${gitBranch}/config`);
+
+/**
   * @param  {String} appName
   * @param  {String} userName
   * @return {Promise<Axios>}
@@ -119,4 +136,6 @@ module.exports = {
   postAppCenterFileAsset,
   getAppCenterDistributionGroups,
   getAppCenterAppToolsets,
+  getAppCenterBranchConfig,
+  putAppCenterBranchConfig,
 };

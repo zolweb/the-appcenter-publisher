@@ -2,6 +2,8 @@
 const appRootPath = require('app-root-path');
 // eslint-disable-next-line import/no-dynamic-require
 const CONFIG_FILE = require(`${appRootPath}/.publishrc`);
+const fs = require('fs');
+const { PROMPT_PLATFORMS, PROMPT_ENVIRONMENTS } = require('./constants');
 
 const DEFAULT_CONFIG = {
   startingVersionNumber: '1.0.0',
@@ -80,9 +82,44 @@ const getConfigObject = () => ({
   },
 });
 
+/**
+ * Write env.js file using local environment variables from config file
+ */
+const writeEnvJsFile = () => {
+  printConsoleMessage('Writing env.js file with local variables');
+
+  const allVariables = CONFIG_FILE.environmentVariables;
+
+  if (allVariables) {
+    const localVariables = Object.entries(allVariables)?.map(([key, value]) => ({ [key]: value?.staging }));
+    const fileContent = `${localVariables?.map((envVar) => `export const ${Object.keys(envVar)} = '${Object.values(envVar)}';`).join('\n')}\n`;
+    fs.writeFileSync('env.js', fileContent);
+  } else {
+    printConsoleMessage('There is no variable in config file, skipping.');
+  }
+};
+
+/**
+ * Validation ofr params given to CI mode
+ * @param platform
+ * @param env
+ */
+const validateCIParams = ({ platform, env }) => {
+  if (!PROMPT_PLATFORMS?.includes(platform) && !Array.isArray(platform)) {
+    printErrorConsoleMessage(`platform param is incorrect, possible values are : ${PLATFORMS?.join(' or ')}. Leave empty for both`);
+    process.exit(1);
+  }
+  if (env && !PROMPT_ENVIRONMENTS?.includes(env)) {
+    printErrorConsoleMessage(`env param is incorrect, possible values are : ${ENVIRONMENTS?.join(' or ')}.`);
+    process.exit(1);
+  }
+};
+
 module.exports = {
   printConsoleMessage,
   printErrorConsoleMessage,
   validateProjectConfig,
   getConfigObject,
+  writeEnvJsFile,
+  validateCIParams,
 };
