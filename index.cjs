@@ -22,6 +22,7 @@ const SCRIPT_PARAMS = {
   UPDATE_CONFIG: '--update-config',
   CI_MODE: '--ci',
   VAR_CONFIG: '--add-variable',
+  HOTFIX_MODE: '--hotfix',
 };
 
 const deployPromptQuestions = [
@@ -40,7 +41,9 @@ const deployPromptQuestions = [
   },
 ];
 
-const triggerDeployScript = async ({ isCi, platformParam, branchParam }) => {
+const triggerDeployScript = async ({
+  isCi, platformParam, branchParam, isHotfix,
+}) => {
   const CONFIG = getConfigObject();
   let platform = platformParam;
   let branch = branchParam;
@@ -52,7 +55,7 @@ const triggerDeployScript = async ({ isCi, platformParam, branchParam }) => {
       branch = userResponse.branch;
     }
     // Run all the git commands to manage the versioning
-    await manageGitFlow(branch, CONFIG);
+    await manageGitFlow(branch, CONFIG, isHotfix);
     // Trigger AppCenter build via API call
     triggerAppCenterBuild(platform, branch);
   } catch (error) {
@@ -78,6 +81,7 @@ async function startScript() {
   const isUpdateConfig = args.includes(SCRIPT_PARAMS.UPDATE_CONFIG);
   const isCI = args.includes(SCRIPT_PARAMS.CI_MODE);
   const isVariableConfig = args.includes(SCRIPT_PARAMS.VAR_CONFIG);
+  const isHotfix = args.includes(SCRIPT_PARAMS.HOTFIX_MODE);
 
   if (isInitConfig || isUpdateConfig) {
     return triggerInitConfigScript();
@@ -85,7 +89,6 @@ async function startScript() {
   if (isVariableConfig && CONFIG_FILE.environmentVariables) {
     return triggerVariableConfigScript();
   }
-
   if (isCI) {
     const defaultEnv = 'staging';
     const formattedArgs = args.reduce((acc, item) => {
@@ -105,7 +108,7 @@ async function startScript() {
     });
   }
 
-  return triggerDeployScript({ isCi: false });
+  return triggerDeployScript({ isCi: false, isHotfix });
 }
 
 startScript();
