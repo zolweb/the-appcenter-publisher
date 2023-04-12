@@ -347,6 +347,38 @@ const getXcodeToolsetsConfig = async (
 };
 
 /**
+ * Update appCenter config for a specific env
+ * @param {'staging'|'pre-prod'|'prod'} env
+ * @param {'ios'|'android'} platform * @param {object} newConfig
+ * @returns {Promise<void>}
+ */
+const handleUpdateConfig = async (env, platform, newConfig) => {
+  const branchConfigLoader = ora().start(`\x1b[1mUpdate appCenter ${env} config on ${platform}\x1b[0m\n`);
+  try {
+    // Send API Call
+    const configQueryRes = await putAppCenterBranchConfig(
+      CONFIG.appCenter.appName?.[platform],
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+      {
+        ...newConfig,
+        environmentVariables: newConfig?.environmentVariables,
+      },
+    );
+    if ([200, 201].includes(configQueryRes.status)) {
+      branchConfigLoader.succeed(`\x1b[1m App center ${platform} ${env} config updated with success !\x1b[0m`);
+    }
+  } catch (error) {
+    if (error.response.status === 404) {
+      branchConfigLoader.succeed(`Config of ${platform} for ${env} doesn't exist, please create branch configuration, skipping\n`);
+    } else {
+      branchConfigLoader.fail(`Could not update config on ${platform} ${env}\n`);
+      printErrorConsoleMessage(`${error?.response?.status} ${error?.response?.data}`);
+    }
+  }
+};
+
+/**
  * Send the previously built App Center Config object to the API
  * @param  {String} branchEnvironment
  * @param  {string} applicationPlatform
@@ -384,7 +416,8 @@ const sendAppcenterBranchConfig = async (
     }
   } catch (error) {
     if (error.response.status === 409) {
-      branchConfigLoader.fail(`A ${envLoaderString} already exists, please update instead.\n`);
+      branchConfigLoader.warn(`A ${envLoaderString} already exists, update instead.\n`);
+      await handleUpdateConfig(branchEnvironment, applicationPlatform, appCenterConfigToSend);
     } else {
       branchConfigLoader.fail(`Could not create ${envLoaderString}\n`);
       printErrorConsoleMessage(`${error.response.status} ${JSON.stringify(error.response.data)}`);
@@ -393,7 +426,37 @@ const sendAppcenterBranchConfig = async (
 };
 
 // EXPORTED METHODS
+/**
+ * Get appCenter config for a specific env
+ * @param {string} env 'staging' or 'pre-prod' or 'prod'
+ * @param {string} platform 'ios or 'android
+ * @returns {Promise<void>}
+ */
+const retrieveEnvConfig = async (env, platform) => {
+  const branchConfigLoader = ora().start(`\x1b[1mGet ${platform} ${env} AppCenter config\x1b[0m\n`);
+  try {
+    const getBranchConfig = await getAppCenterBranchConfig(
+      CONFIG.appCenter.appName?.[platform],
+      CONFIG.appCenter.userName,
+      CONFIG.git.branches?.[env],
+    );
 
+    if ([200, 201].includes(getBranchConfig.status)) {
+      branchConfigLoader.succeed(`\x1b[1m Get ${platform} ${env} AppCenter config with success !\x1b[0m`);
+      return getBranchConfig?.data;
+    }
+  } catch (error) {
+    branchConfigLoader.fail('Could not get config\n');
+    // eslint-disable-next-line no-console
+    console.error('ERR ', error?.response?.status, error?.response?.data);
+  }
+  return null;
+};
+
+/**
+ * Create distribution groups in app center config
+ * @returns {Promise<void>}
+ */
 const createAppCenterDistributionGroups = async () => {
   const DISTRIBUTION_GROUPS_NAMES = [
     APP_CENTER_ENV_GROUP_NAMES.staging,
@@ -514,71 +577,12 @@ const createAppCenterBranchConfig = async () => {
           ),
         };
       }
-
       await sendAppcenterBranchConfig(
         branchEnvironment,
         applicationPlatform,
         toolsets,
         environmentVariables,
       );
-    }
-  }
-};
-
-/**
- * Get appCenter config for a specific env
- * @param {'staging'|'pre-prod'|'prod'} env
- * @param {'ios'|'android'} platform
- * @returns {Promise<void>}
- */
-const retrieveEnvConfig = async (env, platform) => {
-  const branchConfigLoader = ora().start(`\x1b[1mGet ${platform} ${env} AppCenter config\x1b[0m\n`);
-  try {
-    const getBranchConfig = await getAppCenterBranchConfig(
-      CONFIG.appCenter.appName?.[platform],
-      CONFIG.appCenter.userName,
-      CONFIG.git.branches?.[env],
-    );
-
-    if ([200, 201].includes(getBranchConfig.status)) {
-      branchConfigLoader.succeed(`\x1b[1m Get ${platform} ${env} AppCenter config with success !\x1b[0m`);
-      return getBranchConfig?.data;
-    }
-  } catch (error) {
-    branchConfigLoader.fail('Could not get config\n');
-    printErrorConsoleMessage('ERR ', error?.response?.status, error?.response?.data);
-  }
-  return null;
-};
-
-/**
- * Update appCenter config for a specific env
- * @param {'staging'|'pre-prod'|'prod'} env
- * @param {'ios'|'android'} platform * @param {object} newConfig
- * @returns {Promise<void>}
- */
-const handleUpdateConfig = async (env, platform, newConfig) => {
-  const branchConfigLoader = ora().start(`\x1b[1mUpdate appCenter ${env} config on ${platform}\x1b[0m\n`);
-  try {
-    // Send API Call
-    const configQueryRes = await putAppCenterBranchConfig(
-      CONFIG.appCenter.appName?.[platform],
-      CONFIG.appCenter.userName,
-      CONFIG.git.branches?.[env],
-      {
-        ...newConfig,
-        environmentVariables: newConfig?.environmentVariables,
-      },
-    );
-    if ([200, 201].includes(configQueryRes.status)) {
-      branchConfigLoader.succeed(`\x1b[1m App center ${platform} ${env} config updated with success !\x1b[0m`);
-    }
-  } catch (error) {
-    if (error.response.status === 404) {
-      branchConfigLoader.succeed(`Config of ${platform} for ${env} doesn't exist, please create branch configuration, skipping\n`);
-    } else {
-      branchConfigLoader.fail(`Could not update config on ${platform} ${env}\n`);
-      printErrorConsoleMessage(`${error?.response?.status} ${error?.response?.data}`);
     }
   }
 };

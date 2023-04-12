@@ -204,7 +204,6 @@ const manageGitFlow = async (targetedEnv, CONFIG) => {
       gitTagBranch(newVersionNumber);
     }
   }
-
   printConsoleMessage(`Checkout on ${CONFIG.git.branches[targetedEnv]} branch`);
   execSync(`git checkout ${CONFIG.git.branches[targetedEnv]} && git pull`);
 

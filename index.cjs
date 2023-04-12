@@ -51,7 +51,7 @@ const triggerDeployScript = async ({ isCi, platformParam, branchParam }) => {
       platform = userResponse.platform;
       branch = userResponse.branch;
     }
-    // Run all the git commands to manage the versionning
+    // Run all the git commands to manage the versioning
     await manageGitFlow(branch, CONFIG);
     // Trigger AppCenter build via API call
     triggerAppCenterBuild(platform, branch);

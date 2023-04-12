@@ -133,7 +133,11 @@ You will need to run the script with this argument only once in your project. As
 
 ### `--update-config`
 
-Yet to come
+Use this command to update project configuration and set up your builds environment. In details it will :
+- check if every branch exists on repo and create them if necessary
+- create the distribution groups Staging and Pre-prod for your App Center applications
+- for each of your App Center applications and your git branches configure properly and link the builds to the right distribution group
+
 
 ### `--add-variable`
 
@@ -145,7 +149,7 @@ This script will take this variables and :
 
 
 ### `--hotfix`
-
+//TODO hotfix mode build the app on the env default branch, without getting changes from other branches
 Yet to come but if you encounter a hotfix to make, here is the process to follow (and that the script will follow):
 
 Will check if you have any `hotfix/` branch open, squash the commits and merge the branch into your production one. Then will trigger a build and update your changelog. Finally will checkout on your staging branch and get the hotfix there.
