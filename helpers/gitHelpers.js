@@ -121,27 +121,19 @@ const gitCreateCommitMessage = (
 ) => {
   const CONFIG = getConfigObject();
   const commitMessageBase = `Publish new ${targetedEnv} version`;
-  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(commitMessageBase);
-
-  if (!isLastCommitAlreadyAPublish) {
-    printConsoleMessage(
-      `Create publishing commit for version ${newVersionNumber}`,
-    );
-    execSync('git add .');
-    execSync(
-      `git commit --allow-empty -m "${commitMessageBase} ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
-    );
-    execSync('git push');
-  } else {
-    printConsoleMessage(
-      'Publish commit already exists, skipping step',
-    );
-  }
+  printConsoleMessage(
+    `Create publishing commit for version ${newVersionNumber}`,
+  );
+  execSync('git add .');
+  execSync(
+    `git commit --allow-empty -m "${commitMessageBase} ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
+  );
+  execSync('git push');
 };
 
-const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv) => {
-  const CONFIG = getConfigObject();
-  execSync(`git checkout ${CONFIG.git.branches.staging} && git pull`);
+const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
+  // execSync(`git checkout ${CONFIG.git.branches.staging} && git pull`);
+  execSync(`git checkout ${CONFIG.git.branches[targetedEnv]} && git pull`);
 
   const latestTag = getLatestTagVersionNumber(CONFIG.startingVersionNumber);
   const commitSplitMarker = '----DELIMITER----';
@@ -186,10 +178,34 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv) => {
   return newVersionNumber;
 };
 
-const manageGitFlow = async (targetedEnv, CONFIG) => {
+const manageGitFlow = async (targetedEnv, CONFIG, isHotfix) => {
   const isTargetForProd = targetedEnv === 'prod';
+
+  // checkout on targeted branch and pull changes
+  printConsoleMessage(`Checkout on ${CONFIG.git.branches[targetedEnv]} branch`);
+  execSync(`git checkout ${CONFIG.git.branches[targetedEnv]} && git pull`);
+
+  // Pull changes from previous env (staging for preprod, preprod for prod, not for hotfix mode)
+  if (!isHotfix) {
+    printConsoleMessage(
+      'Pulling changes',
+    );
+    switch (targetedEnv) {
+      case CONFIG.git.branches['pre-prod']:
+        execSync(`git pull origin ${CONFIG.git.branches.staging} && git push`);
+        break;
+      case CONFIG.git.branches.prod:
+        execSync(`git pull origin ${CONFIG.git.branches['pre-prod']} && git push`);
+        break;
+      default:
+        execSync(`git pull origin ${CONFIG.git.branches.staging} && git push`);
+        break;
+    }
+  }
+  // generate changelogs from targeted branch
   const newVersionNumber = gitGenerateChangeLog(isTargetForProd, targetedEnv, CONFIG);
 
+  // handle version and tag (prod only)
   if (isTargetForProd) {
     const { shouldTagVersion } = await prompt([
       {
@@ -204,26 +220,12 @@ const manageGitFlow = async (targetedEnv, CONFIG) => {
       gitTagBranch(newVersionNumber);
     }
   }
-  printConsoleMessage(`Checkout on ${CONFIG.git.branches[targetedEnv]} branch`);
-  execSync(`git checkout ${CONFIG.git.branches[targetedEnv]} && git pull`);
-
-  printConsoleMessage(
-    'Pulling changes',
-  );
-  switch (targetedEnv) {
-    case CONFIG.git.branches['pre-prod']:
-      execSync(`git pull origin ${CONFIG.git.branches.staging} && git push`);
-      break;
-    case CONFIG.git.branches.prod:
-      execSync(`git pull origin ${CONFIG.git.branches['pre-prod']} && git push`);
-      break;
-    default:
-      execSync(`git pull origin ${CONFIG.git.branches.staging} && git push`);
-      break;
-  }
 
   printConsoleMessage(`Going back to ${CONFIG.git.branches.staging} branch`);
-  execSync(`git checkout ${CONFIG.git.branches.staging}`);
+  if (isHotfix) {
+    return execSync(`git checkout ${CONFIG.git.branches.staging} && git pull origin ${CONFIG.git.branches[targetedEnv]} && git push`);
+  }
+  return execSync(`git checkout ${CONFIG.git.branches.staging}`);
 };
 
 const manageGitBranches = () => {
