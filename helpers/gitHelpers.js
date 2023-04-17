@@ -121,26 +121,17 @@ const gitCreateCommitMessage = (
 ) => {
   const CONFIG = getConfigObject();
   const commitMessageBase = `Publish new ${targetedEnv} version`;
-  const isLastCommitAlreadyAPublish = execSync('git log -1 --pretty=%B').toString('utf-8').includes(commitMessageBase);
-
-  if (!isLastCommitAlreadyAPublish) {
-    printConsoleMessage(
-      `Create publishing commit for version ${newVersionNumber}`,
-    );
-    execSync('git add .');
-    execSync(
-      `git commit --allow-empty -m "${commitMessageBase} ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
-    );
-    execSync('git push');
-  } else {
-    printConsoleMessage(
-      'Publish commit already exists, skipping step',
-    );
-  }
+  printConsoleMessage(
+    `Create publishing commit for version ${newVersionNumber}`,
+  );
+  execSync('git add .');
+  execSync(
+    `git commit --allow-empty -m "${commitMessageBase} ${newVersionNumber}" -m "${formatGitMessage(newChangelog, commitSplitMarker, newVersionNumber, CONFIG)}"`,
+  );
+  execSync('git push');
 };
 
 const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
-  // TODO demander à Yann Why on develop and not on targeted env?
   // execSync(`git checkout ${CONFIG.git.branches.staging} && git pull`);
   execSync(`git checkout ${CONFIG.git.branches[targetedEnv]} && git pull`);
 
@@ -175,14 +166,6 @@ const gitGenerateChangeLog = (shouldGenerateChangeLog, targetedEnv, CONFIG) => {
     const currentChangelog = fs.readFileSync(CHANGELOG_FILE_PATH, 'utf-8');
     printConsoleMessage(`Generate Change Log for version ${newVersionNumber}`);
     fs.writeFileSync(CHANGELOG_FILE_PATH, `${newChangelog}${currentChangelog}`);
-    // Commit changelog file
-    printConsoleMessage(
-      'Commit changelogs file',
-    );
-    execSync('git add .');
-    execSync(
-      'git commit -m "[*] update changelogs"',
-    );
   }
 
   gitCreateCommitMessage(
@@ -238,9 +221,11 @@ const manageGitFlow = async (targetedEnv, CONFIG, isHotfix) => {
     }
   }
 
-  // TODO demander à Yann pourquoi on revient toujours sur staging et pas sur la target branch ?
   printConsoleMessage(`Going back to ${CONFIG.git.branches.staging} branch`);
-  execSync(`git checkout ${CONFIG.git.branches.staging}`);
+  if (isHotfix) {
+    return execSync(`git checkout ${CONFIG.git.branches.staging} && git pull origin ${CONFIG.git.branches[targetedEnv]} && git push`);
+  }
+  return execSync(`git checkout ${CONFIG.git.branches.staging}`);
 };
 
 const manageGitBranches = () => {
